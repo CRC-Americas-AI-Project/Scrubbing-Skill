@@ -1,0 +1,25 @@
+{
+  "name": "sap-scrubbing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SAP Scrubbing MCP — Harmony + DCD servers para uso com Joule Desktop e Claude Code",
+  "workspaces": [
+    "packages/shared/mcp-utils",
+    "packages/shared/mcp-logger",
+    "packages/shared/sap-auth",
+    "packages/servers/sap-harmony-mcp",
+    "packages/servers/sap-dcd-mcp"
+  ],
+  "scripts": {
+    "build": "npm run build:shared && npm run build:servers",
+    "build:shared": "npm run build --workspace=mcp-utils && npm run build --workspace=mcp-logger && npm run build --workspace=sap-auth",
+    "build:servers": "npm run build --workspace=sap-harmony-mcp && npm run build --workspace=sap-dcd-mcp",
+    "start:scrubbing": "bash start-scrubbing.sh",
+    "start:harmony":   "node packages/servers/sap-harmony-mcp/src/mcp-server-http.mjs",
+    "start:dcd":       "node packages/servers/sap-dcd-mcp/src/mcp-server-http.mjs"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm":  ">=10.0.0"
+  }
+}

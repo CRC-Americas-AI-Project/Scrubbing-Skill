@@ -1,0 +1,26 @@
+# Dependências
+node_modules/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+.env
+*.local
+
+# Credenciais de autenticação — nunca commitar
+# (geradas automaticamente em ~/.sap-mcp/auth.json)
+auth.json
+
+# Artefatos locais de desenvolvimento
+*.bak-*
+scratch/
+dcd-contracts-*/
+snap-*.md
+opp-*.png
+
+# Planos do Claude Code (uso interno)
+.claude/plans/

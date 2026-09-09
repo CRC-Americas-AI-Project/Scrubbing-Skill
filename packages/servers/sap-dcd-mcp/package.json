@@ -1,0 +1,16 @@
+{
+  "name": "sap-dcd-mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MCP server exposing SAP Digital Contract Data (DCD) Cockpit (mdsdlcdcdcockpit / ZDCD_SRV) — customer search, contract headers & line items, ~130 clause fields, and signed-contract PDF download — authenticated via shared sap-auth (headless SSO)",
+  "main": "src/mcp-server.mjs",
+  "scripts": {
+    "start": "node src/mcp-server.mjs",
+    "cli": "node src/cli.mjs",
+    "build": "echo \"no build step (pure ESM JS)\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "sap-auth": "*"
+  }
+}

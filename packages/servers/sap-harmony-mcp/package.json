@@ -1,0 +1,25 @@
+{
+  "name": "sap-harmony-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP server exposing SAP Harmony (Callidus CPQ) — reads, RPC actions, and writes over OData + Callidus scripts. Authenticated via shared sap-auth (headless SSO).",
+  "main": "src/mcp-server.mjs",
+  "exports": {
+    "./harmony-client.mjs": "./src/harmony-client.mjs",
+    "./cpq-client.mjs": "./src/cpq-client.mjs",
+    "./browser-helpers.mjs": "./src/browser-helpers.mjs"
+  },
+  "scripts": {
+    "start": "node src/mcp-server.mjs",
+    "cli": "node src/cli.mjs",
+    "test": "node --test 'test/*.test.mjs'",
+    "build": "echo \"no build step (pure ESM JS)\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "sap-auth": "*"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.44.0"
+  }
+}
