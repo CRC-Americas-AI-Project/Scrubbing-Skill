@@ -1,0 +1,21 @@
+{
+  "name": "scrubbing-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Unified SAP MCP server (Harmony + DCD) — 41 tools over a single HTTP endpoint for shared-server deployment. Multi-user via per-user worker pool with isolated auth stores.",
+  "main": "src/worker.mjs",
+  "scripts": {
+    "start": "node src/mcp-server-http.mjs",
+    "start:stdio": "node src/worker.mjs",
+    "build": "echo \"no build step (pure ESM JS)\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "sap-auth": "*",
+    "sap-harmony-mcp": "*",
+    "sap-dcd-mcp": "*"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

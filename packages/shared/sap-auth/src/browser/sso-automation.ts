@@ -25,7 +25,7 @@ const PAGE_CONTENT_TIMEOUT_MS = 5000;
 const REDIRECT_POLL_INTERVAL_MS = 2000;
 const REDIRECT_POLL_MAX_MS = 15000;
 const AUTHENTICATOR_POLL_INTERVAL_MS = 3000;
-const AUTHENTICATOR_POLL_MAX_MS = 60000;
+const AUTHENTICATOR_POLL_MAX_MS = 90000;
 const AUTHENTICATOR_PROGRESS_LOG_INTERVAL_MS = 15000;
 
 /** Selectors for enterprise SSO trigger links on login pages. */
@@ -107,20 +107,27 @@ export async function attemptHeadlessAuth(
       }
 
       // Redirect may chain to microsoftonline.com — fall through to MS automation
-      if (!postUrl.includes('microsoftonline.com')) {
+      if (postUrl.includes('microsoftonline.com')) {
+        currentUrl = postUrl;
+      } else if (postUrl.includes('accounts.sap.com')) {
+        // SAP IDP showed a login form — fall through to email/password automation below
+        log.info('SAP IDP login form detected — attempting form fill');
+        currentUrl = postUrl;
+        // Don't return here — fall through to the email input automation at step 4
+      } else {
         log.info('SSO redirect did not reach target — needs user interaction');
         return { success: false, needsUserInteraction: true };
       }
-      currentUrl = postUrl;
     }
 
-    // 4. On microsoftonline.com — proceed with MS SSO automation
+    // 4. On microsoftonline.com or SAP IDP login form — proceed with automation
 
     // Look for email input field with timeout
+    // Supports both Microsoft SSO (input[type="email"]) and SAP IDP (#j_username type="text")
     let emailInput;
     try {
       emailInput = await Promise.race([
-        page.$('input[type="email"]'),
+        page.$('input[type="email"], #j_username'),
         new Promise<null>((_, reject) =>
           setTimeout(() => reject(new Error('Element search timeout')), ELEMENT_SEARCH_TIMEOUT_MS),
         ),
@@ -160,7 +167,8 @@ export async function attemptHeadlessAuth(
         const submitButton =
           (await page.$('input[type="submit"]')) ||
           (await page.$('button[type="submit"]')) ||
-          (await page.$('#idSIButton9'));
+          (await page.$('#idSIButton9')) ||
+          (await page.$('#logOnFormSubmit'));  // SAP IDP "Continue" button
 
         if (submitButton) {
           log.info('Clicking submit button...');
@@ -171,6 +179,67 @@ export async function attemptHeadlessAuth(
             ),
           ]);
           await delay(POST_SUBMIT_DELAY_MS);
+          // Snapshot após o Continue para diagnóstico
+          await saveDebugSnapshot(page, 'after-continue');
+          log.info(`URL after Continue: ${page.url()}`);
+
+          // Detect SAP IDP password field (conditional_logon page after email submit)
+          const passwordInput = await page.$('#j_password, input[type="password"]').catch(() => null);
+          if (passwordInput) {
+            const password = process.env.SAP_AUTH_PASSWORD;
+            if (!password) {
+              log.warn('SAP IDP requires password but SAP_AUTH_PASSWORD env var is not set');
+            } else {
+              log.info('SAP IDP password field detected — filling password');
+              await (passwordInput as any).click();
+              await (passwordInput as any).evaluate((el: HTMLInputElement) => (el.value = ''));
+              await (passwordInput as any).type(password);
+              const pwSubmit =
+                (await page.$('#logOnFormSubmit')) ||
+                (await page.$('button[type="submit"]')) ||
+                (await page.$('input[type="submit"]'));
+              if (pwSubmit) {
+                log.info('Clicking password submit button...');
+                await (pwSubmit as any).click();
+                await delay(POST_SUBMIT_DELAY_MS);
+                log.info(`URL after password submit: ${page.url()}`);
+
+                // Detect 2FA choice page (RADIUS / WEB / TOTP)
+                const radiusButton = await page.$('#tfaChoiceRsaButton').catch(() => null);
+                const webButton = await page.$('[name="tfaChoiceWeb"], #tfaChoiceWebButton, [id*="web" i][type="submit"], button[name*="web" i]').catch(() => null)
+                  ?? await page.evaluate(() => {
+                    const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+                    return btns.find(b => b.textContent?.toLowerCase().includes('web')) ? true : null;
+                  }).catch(() => null);
+
+                if (webButton && webButton !== true) {
+                  // Prefer WEB 2FA — uses Microsoft Authenticator push (automated via waitForAuthenticatorApproval)
+                  log.info('SAP IDP 2FA choice detected — clicking WEB button (Authenticator push)');
+                  await (webButton as any).click();
+                  await delay(POST_SUBMIT_DELAY_MS);
+                  log.info(`URL after WEB choice: ${page.url()}`);
+                  await saveDebugSnapshot(page, 'after-web-choice');
+                } else if (webButton === true) {
+                  // Found via text search — click by text
+                  log.info('SAP IDP 2FA choice detected — clicking WEB button by text');
+                  await page.evaluate(() => {
+                    const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+                    const btn = btns.find(b => b.textContent?.toLowerCase().includes('web')) as HTMLElement;
+                    if (btn) btn.click();
+                  });
+                  await delay(POST_SUBMIT_DELAY_MS);
+                  log.info(`URL after WEB choice: ${page.url()}`);
+                  await saveDebugSnapshot(page, 'after-web-choice');
+                } else if (radiusButton) {
+                  log.info('SAP IDP 2FA choice detected — clicking RADIUS button');
+                  await (radiusButton as any).click();
+                  await delay(POST_SUBMIT_DELAY_MS);
+                  log.info(`URL after RADIUS choice: ${page.url()}`);
+                  await saveDebugSnapshot(page, 'after-radius-choice');
+                }
+              }
+            }
+          }
         }
       } catch (submitError) {
         log.warn('Timeout during submit - possible certificate dialog blocking');
@@ -307,7 +376,7 @@ async function tryAccountSelection(page: Page, userEmail: string | undefined): P
 
   while (Date.now() - renderPollStart < ACCOUNT_RENDER_POLL_TIMEOUT_MS) {
     // Check for email input field (means we should stop looking for tiles)
-    const emailInput = await page.$('input[type="email"]');
+    const emailInput = await page.$('input[type="email"], #j_username');
     if (emailInput) {
       log.info(`SSO page render wait: ${Math.round((Date.now() - renderPollStart) / 1000)}s — email input found`);
       return false;

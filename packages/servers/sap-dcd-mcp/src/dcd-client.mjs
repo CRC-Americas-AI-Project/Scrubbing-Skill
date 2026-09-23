@@ -22,6 +22,7 @@
 //   - GetCaseGUID returns the guid nested at d.GetCaseGUID.CaseGuid.
 
 import { createAuthClient } from 'sap-auth';
+import { isBtp, btpFetch } from 'btp-fetch';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -70,12 +71,47 @@ const authClient = createAuthClient({
   },
 });
 
+// ── Auth mode: cookie passthrough > BTP JWT > sap-auth local ─────────────────
+let _btpJwt = null;
+export function setBtpJwt(jwt) { _btpJwt = jwt; }
+
+async function apiFetch(url, init) {
+  const sapCookie = process.env.SAP_SESSION_COOKIE;
+  if (sapCookie) {
+    const res = await fetch(url, {
+      ...init,
+      headers: { Accept: 'application/json', ...init?.headers, Cookie: sapCookie },
+    });
+    if (res.status === 401 || res.status === 403) throw new Error(`DCD ${res.status}: SAP cookie may have expired. Refresh X-Sap-Cookie header.`);
+    if (res.status === 200) {
+      const ct = res.headers.get('content-type') ?? '';
+      if (ct.includes('text/html')) {
+        const body = await res.text();
+        if (isSamlLoginBody(body)) throw new Error('DCD: SAP cookie expired (SAML redirect). Refresh X-Sap-Cookie header.');
+        return new Response(body, { status: 200, headers: res.headers });
+      }
+    }
+    return res;
+  }
+  if (_btpJwt) {
+    const base = `https://${DOMAIN}`;
+    const path = url.startsWith(base) ? url.slice(base.length) : url;
+    try {
+      return await btpFetch('DCD_DEST', _btpJwt, path, init);
+    } catch (e) {
+      process.stdout.write(`[dcd-client] btpFetch error: ${e.message}\n`);
+      throw new Error(`DCD via BTP: ${e.message}`);
+    }
+  }
+  return authClient.fetch(url, init);
+}
+
 // ── Low-level HTTP ─────────────────────────────────────────────────────────────
 async function jget(pathAndQs) {
   const url = pathAndQs.startsWith('http') ? pathAndQs : `${SERVICE_BASE}/${pathAndQs}`;
   let res;
   try {
-    res = await authClient.fetch(url, {
+    res = await apiFetch(url, {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
     });
@@ -107,7 +143,7 @@ async function bget(pathAndQs) {
   const url = pathAndQs.startsWith('http') ? pathAndQs : `${SERVICE_BASE}/${pathAndQs}`;
   let res;
   try {
-    res = await authClient.fetch(url, {
+    res = await apiFetch(url, {
       headers: { Accept: '*/*' },
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
     });
@@ -247,7 +283,7 @@ export async function whoami() {
   const url = `${SERVICE_BASE}/$metadata`;
   let res;
   try {
-    res = await authClient.fetch(url, {
+    res = await apiFetch(url, {
       headers: { Accept: 'application/xml' },
       signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
     });

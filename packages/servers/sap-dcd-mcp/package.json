@@ -12,5 +12,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "sap-auth": "*"
+  },
+  "exports": {
+    "./dcd-client.mjs": "./src/dcd-client.mjs"
   }
 }

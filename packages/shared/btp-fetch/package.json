@@ -1,0 +1,20 @@
+{
+  "name": "btp-fetch",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Thin wrapper for HTTP calls via SAP BTP Destination Service with Principal Propagation. Falls back to null when not running on BTP.",
+  "main": "src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "scripts": {
+    "build": "echo \"no build step (pure ESM JS)\""
+  },
+  "dependencies": {
+    "@sap-cloud-sdk/connectivity": "^3",
+    "@sap-cloud-sdk/http-client": "^3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

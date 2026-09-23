@@ -7,19 +7,31 @@
     "packages/shared/mcp-utils",
     "packages/shared/mcp-logger",
     "packages/shared/sap-auth",
+    "packages/shared/btp-fetch",
     "packages/servers/sap-harmony-mcp",
-    "packages/servers/sap-dcd-mcp"
+    "packages/servers/sap-dcd-mcp",
+    "packages/servers/scrubbing-mcp",
+    "packages/desktop"
   ],
   "scripts": {
+    "start": "node packages/servers/scrubbing-mcp/src/mcp-server-http.mjs",
     "build": "npm run build:shared && npm run build:servers",
     "build:shared": "npm run build --workspace=mcp-utils && npm run build --workspace=mcp-logger && npm run build --workspace=sap-auth",
-    "build:servers": "npm run build --workspace=sap-harmony-mcp && npm run build --workspace=sap-dcd-mcp",
+    "build:servers": "npm run build --workspace=sap-harmony-mcp && npm run build --workspace=sap-dcd-mcp && npm run build --workspace=scrubbing-mcp",
     "start:scrubbing": "bash start-scrubbing.sh",
-    "start:harmony":   "node packages/servers/sap-harmony-mcp/src/mcp-server-http.mjs",
-    "start:dcd":       "node packages/servers/sap-dcd-mcp/src/mcp-server-http.mjs"
+    "start:unified": "bash start-scrubbing.sh --unified",
+    "start:harmony": "node packages/servers/sap-harmony-mcp/src/mcp-server-http.mjs",
+    "start:dcd": "node packages/servers/sap-dcd-mcp/src/mcp-server-http.mjs"
   },
   "engines": {
     "node": ">=20.0.0",
-    "npm":  ">=10.0.0"
+    "npm": ">=10.0.0"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "puppeteer-core": "^25.11.0"
+  },
+  "allowScripts": {
+    "electron@31.7.7": true
   }
 }

@@ -1,0 +1,20 @@
+---
+applications:
+  - name: scrubbing-mcp-server
+    memory: 768M
+    disk_quota: 1G
+    instances: 1
+    random-route: true
+    buildpacks:
+      - https://github.com/cloudfoundry/apt-buildpack
+      - nodejs_buildpack
+    command: node packages/servers/scrubbing-mcp/src/mcp-server-http.mjs
+    health-check-type: http
+    health-check-http-endpoint: /mcp
+    services:
+      - scrubbing-xsuaa
+      - scrubbing-destination
+    env:
+      NODE_ENV: production
+      SCRUBBING_USERS_DIR: /home/vcap/data/scrubbing-users
+      PUPPETEER_SKIP_DOWNLOAD: "true"

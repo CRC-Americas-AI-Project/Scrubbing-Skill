@@ -186,6 +186,7 @@ function buildLaunchOptions(headless: boolean, inPrivate: boolean, userDataDir?:
     headless: headless ? 'new' : false,
     devtools: false,
     executablePath: resolveBrowserPath(),
+    protocolTimeout: 120000,
     ...(userDataDir ? { userDataDir } : {}),
     args: [
       ...getCommonChromeArgs(),

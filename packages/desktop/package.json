@@ -1,0 +1,41 @@
+{
+  "name": "sap-scrubbing-desktop",
+  "version": "1.0.0",
+  "description": "SAP Scrubbing MCP — Desktop app (Electron)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "scrubbing-mcp": "*"
+  },
+  "devDependencies": {
+    "electron": "^31",
+    "electron-builder": "^24"
+  },
+  "build": {
+    "appId": "com.sap.scrubbing-desktop",
+    "productName": "SAP Scrubbing Desktop",
+    "files": ["main.js", "src/**/*", "assets/**/*"],
+    "extraResources": [
+      {
+        "from": "../../node_modules",
+        "to": "node_modules",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.png",
+      "target": "dmg"
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

@@ -16,6 +16,7 @@
 // sap-auth (its process manager would kill the user's CDP Chrome).
 
 import { createAuthClient } from 'sap-auth';
+import { isBtp, btpFetch } from 'btp-fetch';
 import {
   toQuarterId, decodeOppRow, RENEWAL_SOURCE_CODES, RENEWAL_SOURCE_CODES_CLOUD,
   extractRiskFields,
@@ -26,6 +27,45 @@ const BUDGIE_HOST = 'sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand
 const BUDGIE = `https://${BUDGIE_HOST}`;
 const APP_PREFIX = '/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm';
 const ODATA_ROOT = `${BUDGIE}${APP_PREFIX}/sap/opu/odata/sap/zharmony_callidus_srv`;
+
+// ── Auth mode: cookie passthrough > BTP JWT > sap-auth local ─────────────────
+// 1. SAP_SESSION_COOKIE set  → use cookie directly (forwarded by caller)
+// 2. _btpJwt set             → JWT from Joule OAuth2 → Principal Propagation via BTP Destination
+// 3. fallback                → sap-auth Puppeteer SSO (development only)
+let _btpJwt = null;
+export function setBtpJwt(jwt) { _btpJwt = jwt; }
+
+async function apiFetch(url, init) {
+  const sapCookie = process.env.SAP_SESSION_COOKIE;
+  if (sapCookie) {
+    // Cookie passthrough mode: cookie was forwarded by the caller (e.g. Joule header)
+    const res = await fetch(url, {
+      ...init,
+      headers: { Accept: 'application/json', ...init?.headers, Cookie: sapCookie },
+    });
+    if (res.status === 401 || res.status === 403) throw new Error(`Harmony ${res.status}: SAP cookie may have expired. Refresh X-Sap-Cookie header.`);
+    if (res.status === 200) {
+      const ct = res.headers.get('content-type') ?? '';
+      if (ct.includes('text/html')) {
+        const body = await res.text();
+        if (isSamlLoginBody(body)) throw new Error('Harmony: SAP cookie expired (SAML redirect). Refresh X-Sap-Cookie header.');
+        return new Response(body, { status: 200, headers: res.headers });
+      }
+    }
+    return res;
+  }
+  if (_btpJwt) {
+    const path = url.startsWith(BUDGIE) ? url.slice(BUDGIE.length) : url;
+    try {
+      return await btpFetch('HARMONY_DEST', _btpJwt, path, init);
+    } catch (e) {
+      process.stdout.write(`[harmony-client] btpFetch error: ${e.message}\n`);
+      throw new Error(`Harmony via BTP: ${e.message}`);
+    }
+  }
+  // Development fallback: sap-auth Puppeteer SSO (never runs on BTP CF when Joule sends JWT)
+  return authClient.fetch(url, init);
+}
 
 // ── Auth (shared sap-auth) ──────────────────────────────────────────────────
 // The gateway returns a small SAML-fragment HTML body (200 OK, text/html) when
@@ -63,7 +103,7 @@ export async function callidusScript(scriptname, param) {
     Param: JSON.stringify(param),
   }).toString();
   const url = `${BUDGIE}${APP_PREFIX}/callidus/customapi/executescriptfed`;
-  const res = await authClient.fetch(url, {
+  const res = await apiFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -83,7 +123,7 @@ export async function odataGet(path, params = {}) {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) qs.set(k, v);
   const url = `${ODATA_ROOT}/${path}${qs.toString() ? `?${qs}` : ''}`;
-  const res = await authClient.fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await apiFetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`OData GET ${path} HTTP ${res.status}: ${(await res.text()).slice(0, 400)}`);
   return res.json();
 }
@@ -93,8 +133,7 @@ export async function odataGet(path, params = {}) {
 /** Who am I? Cheap end-to-end auth check. */
 export async function whoami() {
   const url = `${BUDGIE}${APP_PREFIX}/user-api/currentUser`;
-  const res = await authClient.fetch(url);
-  if (!res.ok) throw new Error(`whoami HTTP ${res.status}`);
+  const res = await apiFetch(url);
   return res.json();
 }
 
@@ -135,7 +174,7 @@ export async function messagesSet(oppId, type = 'E') {
   qs.set('$filter', `Type eq '${type}'`);
   qs.set('search', String(oppId));
   const url = `${ODATA_ROOT}/MessagesSet?${qs}`;
-  const res = await authClient.fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await apiFetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`MessagesSet HTTP ${res.status}: ${(await res.text()).slice(0, 400)}`);
   const j = await res.json();
   return j?.d?.results ?? j;
@@ -354,7 +393,7 @@ export function quoteContainerFlat(quoteReadResp) {
 /** Fetch the OData service $metadata (EDMX XML). Used for discovering entities, properties, FunctionImports. */
 export async function odataMetadata() {
   const url = `${ODATA_ROOT}/$metadata`;
-  const res = await authClient.fetch(url, { headers: { Accept: 'application/xml' } });
+  const res = await apiFetch(url, { headers: { Accept: 'application/xml' } });
   if (!res.ok) throw new Error(`metadata HTTP ${res.status}`);
   return res.text();
 }
@@ -369,7 +408,7 @@ const CSRF_TTL_MS = 5 * 60_000;   // SAP CSRF tokens are session-scoped, cheap t
 export async function fetchCsrf() {
   const now = Date.now();
   if (cachedCsrf && now - cachedCsrfAt < CSRF_TTL_MS) return cachedCsrf;
-  const res = await authClient.fetch(`${ODATA_ROOT}/`, {
+  const res = await apiFetch(`${ODATA_ROOT}/`, {
     headers: { 'X-CSRF-Token': 'Fetch', 'Accept': 'application/json' },
   });
   const token = res.headers.get('x-csrf-token');
@@ -394,7 +433,7 @@ export async function fetchCsrf() {
 export async function odataMerge(path, patch) {
   const csrf = await fetchCsrf();
   const url = `${ODATA_ROOT}/${path}`;
-  const res = await authClient.fetch(url, {
+  const res = await apiFetch(url, {
     method: 'POST',
     headers: {
       'X-CSRF-Token': csrf,
@@ -426,7 +465,7 @@ export async function odataMerge(path, patch) {
 export async function odataCreate(collection, entity) {
   const csrf = await fetchCsrf();
   const url = `${ODATA_ROOT}/${collection}`;
-  const res = await authClient.fetch(url, {
+  const res = await apiFetch(url, {
     method: 'POST',
     headers: {
       'X-CSRF-Token': csrf,
@@ -1387,7 +1426,7 @@ export async function odataFunction(name, params = {}, method = 'GET', confirmDe
   const url = `${ODATA_ROOT}/${name}?${qs}`;
   const headers = { 'Accept': 'application/json' };
   if (method !== 'GET') headers['X-CSRF-Token'] = await fetchCsrf();
-  const res = await authClient.fetch(url, { method, headers });
+  const res = await apiFetch(url, { method, headers });
   const text = await res.text();
   let body; try { body = JSON.parse(text); } catch { body = { _raw: text }; }
   if (!res.ok) throw new Error(`FunctionImport ${name} HTTP ${res.status}: ${text.slice(0, 400)}`);
@@ -1414,7 +1453,7 @@ const CPQ2_PREFIX = `${BUDGIE}${APP_PREFIX}/oAuthcpq2`;
 /** Call a CPQ 2.0 custom script via the budgie OAuth proxy. JSON body, not form-encoded. */
 export async function cpq2Script(scriptName, param) {
   const url = `${CPQ2_PREFIX}/customapi/executescriptfed`;
-  const res = await authClient.fetch(url, {
+  const res = await apiFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify({ ScriptName: scriptName, Param: JSON.stringify(param) }),
@@ -1435,7 +1474,7 @@ export async function cpq2ListQuotes(oppId) {
 /** GET a CPQ 2.0 REST endpoint (headless, via budgie proxy). */
 async function cpq2Get(path) {
   const url = `${CPQ2_PREFIX}${path}`;
-  const res = await authClient.fetch(url, { headers: { 'Accept': 'application/json' } });
+  const res = await apiFetch(url, { headers: { 'Accept': 'application/json' } });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`cpq2 GET ${path} HTTP ${res.status}: ${text.slice(0, 400)}`);
@@ -1473,7 +1512,7 @@ export async function cpq2ExecuteAction(shortQuoteId, actionId, payload = {}) {
     ItemsFilterQuery: [],
     ...payload,
   };
-  const res = await authClient.fetch(url, {
+  const res = await apiFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify(body),

@@ -1,0 +1,35 @@
+{
+  "xsappname": "na-27739995-033b-4fee-b0d1-b42cc2770f4d",
+  "tenant-mode": "shared",
+  "oauth2-configuration": {
+    "redirect-uris": [
+      "https://*.joule.cfapps.*.hana.ondemand.com/**",
+      "https://*.hana.ondemand.com/**",
+      "http://localhost/**",
+      "http://localhost:*/**",
+      "http://localhost:18766/mcp-callback"
+    ],
+    "grant-types": [
+      "authorization_code",
+      "client_credentials",
+      "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      "urn:ietf:params:oauth:grant-type:saml2-bearer"
+    ],
+    "token-validity": 43200,
+    "refresh-token-validity": 2592000,
+    "credential-types": ["binding-secret", "x509"]
+  },
+  "scopes": [
+    { "name": "$XSAPPNAME.user", "description": "Scrubbing MCP user" }
+  ],
+  "role-templates": [
+    { "name": "User", "description": "Scrubbing MCP user", "scope-references": ["$XSAPPNAME.user"] }
+  ],
+  "role-collections": [
+    {
+      "name": "Scrubbing MCP User",
+      "description": "Access to Scrubbing MCP tools",
+      "role-template-references": ["$XSAPPNAME.User"]
+    }
+  ]
+}
