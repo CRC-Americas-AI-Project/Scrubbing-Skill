@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; color: #333; }
+  h1 { color: #0070f3; border-bottom: 2px solid #0070f3; padding-bottom: 8px; }
+  h2 { color: #333; margin-top: 32px; }
+  .step { background: #f5f5f5; border-left: 4px solid #0070f3; padding: 12px 16px; margin: 12px 0; border-radius: 4px; }
+  .step .num { font-size: 22px; font-weight: bold; color: #0070f3; }
+  code { background: #e8e8e8; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-family: monospace; }
+  .code-block { background: #1e1e1e; color: #d4d4d4; padding: 14px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 8px 0; white-space: pre; }
+  .note { background: #fffbe6; border: 1px solid #ffe58f; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 8px 0; }
+  .success { background: #f6ffed; border: 1px solid #b7eb8f; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 8px 0; }
+  .joule-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  .joule-table th { background: #0070f3; color: white; padding: 8px 12px; text-align: left; }
+  .joule-table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  .joule-table tr:nth-child(even) td { background: #f9f9f9; }
+  .tag { display: inline-block; background: #0070f3; color: white; border-radius: 12px; padding: 2px 10px; font-size: 12px; }
+  @media print { body { margin: 20px; } }
+</style>
+</head>
+<body>
+
+<h1>SAP Scrubbing MCP — Instalação</h1>
+<p style="color:#666; margin-top:-8px;">Guia rápido para o Joule Desktop</p>
+
+<!-- MAC -->
+<h2><span class="tag">Mac</span> Instalação</h2>
+
+<div class="step">
+  <div class="num">1</div>
+  Abra o <strong>Terminal</strong> (Cmd+Espaço → digite "Terminal") e cole o comando abaixo:
+  <div class="code-block">curl -fsSL https://raw.githubusercontent.com/CRC-Americas-AI-Project/Scrubbing-Skill/main/install.sh | bash</div>
+  Aguarde ~2 minutos. O servidor inicia automaticamente.
+</div>
+
+<div class="success">✅ Após concluir, o servidor inicia toda vez que você liga o computador — sem nenhuma ação necessária.</div>
+
+<!-- WINDOWS -->
+<h2><span class="tag">Windows</span> Instalação</h2>
+
+<div class="step">
+  <div class="num">1</div>
+  Baixe o arquivo <strong>install.ps1</strong> que foi enviado para você.
+</div>
+
+<div class="step">
+  <div class="num">2</div>
+  Clique com o botão <strong>direito</strong> no arquivo → <strong>"Executar com o PowerShell"</strong><br>
+  Aguarde ~2 minutos. O servidor inicia automaticamente.
+</div>
+
+<div class="success">✅ Um atalho <strong>"SAP Scrubbing MCP.bat"</strong> é criado na sua área de trabalho. O servidor também inicia automaticamente no login.</div>
+
+<!-- JOULE -->
+<h2>Configurar o Joule Desktop</h2>
+<p>Joule Desktop → <strong>Settings → Extensions → Add Connector</strong></p>
+
+<table class="joule-table">
+  <tr><th>Campo</th><th>Valor</th></tr>
+  <tr><td><strong>Name</strong></td><td>SAP Scrubbing MCP</td></tr>
+  <tr><td><strong>URL</strong></td><td><code>http://localhost:8812/mcp</code></td></tr>
+  <tr><td><strong>Auth</strong></td><td>None</td></tr>
+</table>
+
+<div class="note">⚠️ O Joule e o servidor precisam estar no mesmo computador. A URL <code>localhost</code> só funciona localmente.</div>
+
+<!-- PRIMEIRO USO -->
+<h2>Primeira utilização</h2>
+<div class="step">
+  Na primeira chamada ao Harmony, o servidor faz login SAP automaticamente usando as credenciais da sua máquina. Nenhuma ação necessária.
+</div>
+
+<hr style="margin-top:40px; border:none; border-top:1px solid #eee;">
+<p style="font-size:12px; color:#999; text-align:center;">SAP Renewals — CRC Americas AI Project</p>
+
+</body>
+</html>
