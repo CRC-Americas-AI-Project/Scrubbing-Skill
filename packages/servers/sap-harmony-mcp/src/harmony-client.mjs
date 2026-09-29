@@ -15,7 +15,7 @@
 // see cpq-client.mjs — that path has separate auth and MUST NOT import
 // sap-auth (its process manager would kill the user's CDP Chrome).
 
-import { createAuthClient } from 'sap-auth';
+import { createAuthClient, AuthManager } from 'sap-auth';
 import { isBtp, btpFetch } from 'btp-fetch';
 import {
   toQuarterId, decodeOppRow, RENEWAL_SOURCE_CODES, RENEWAL_SOURCE_CODES_CLOUD,
@@ -1643,3 +1643,32 @@ export async function cpq2ExecuteAction(shortQuoteId, actionId, payload = {}) {
   return parsed;
 }
 
+
+// ── Auth renewal ────────────────────────────────────────────────────────────────
+const DCD_HOST  = 'sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com';
+const DCD_ENTRY = 'https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html';
+
+export async function renewAuth() {
+  // Ensure both providers are registered before forcing renewal.
+  // createAuthClient is idempotent — safe to call even if already registered.
+  createAuthClient({ domain: DCD_HOST, method: 'sap-sso', entryUrl: DCD_ENTRY });
+
+  const auth = AuthManager.getInstance();
+  const results = {};
+
+  try { await auth.forceReauth(BUDGIE_HOST); results.harmony = 'ok'; }
+  catch (e) { results.harmony = `error: ${e.message}`; }
+
+  try { await auth.forceReauth(DCD_HOST); results.dcd = 'ok'; }
+  catch (e) { results.dcd = `error: ${e.message}`; }
+
+  const ok = results.harmony === 'ok' && results.dcd === 'ok';
+  return {
+    ok,
+    harmony: results.harmony,
+    dcd: results.dcd,
+    message: ok
+      ? 'SAP cookies renovados. Harmony + DCD prontos.'
+      : 'Renovacao parcial — ver detalhes.',
+  };
+}

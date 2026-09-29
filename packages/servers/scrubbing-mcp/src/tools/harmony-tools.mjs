@@ -13,6 +13,11 @@ async function cpq() {
 
 export const HARMONY_TOOLS = [
   {
+    name: 'renew_auth',
+    description: 'Renova os cookies SAP (Harmony + DCD) via sap-auth SSO. Chamar IMEDIATAMENTE quando harmony_whoami ou dcd_whoami retornar erro de autenticação (401/403/SAML/CSRF/fetch failed). O sap-auth abre Edge/Chrome automaticamente com SSO corporativo Windows. Aguardar até ~60s. Após conclusão, repetir whoami para confirmar.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'harmony_whoami',
     description: 'Returns the currently authenticated Harmony user. Cheap end-to-end auth check via shared sap-auth (headless SSO). First call if anything else auth-errors.',
     inputSchema: { type: 'object', properties: {} },
@@ -476,6 +481,7 @@ export const HARMONY_TOOLS = [
 
 export async function dispatchHarmony(name, args) {
   switch (name) {
+    case 'renew_auth': return h.renewAuth();
     case 'harmony_whoami': return h.whoami();
     case 'harmony_quote_permissions': return h.quotePermissions(args.quoteCompositeNumber);
     case 'harmony_quote_read': return h.quoteRead(args.quoteCompositeNumber, args.param);

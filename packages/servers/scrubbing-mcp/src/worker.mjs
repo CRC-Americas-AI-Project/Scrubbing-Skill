@@ -48,8 +48,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args = {} } = req.params;
   try {
     let result;
-    if (name.startsWith('harmony_'))      result = await dispatchHarmony(name, args);
-    else if (name.startsWith('dcd_'))     result = await dispatchDcd(name, args);
+    if (name === 'renew_auth')             result = await dispatchHarmony(name, args);
+    else if (name.startsWith('harmony_'))  result = await dispatchHarmony(name, args);
+    else if (name.startsWith('dcd_'))      result = await dispatchDcd(name, args);
     else throw new Error(`Unknown tool: ${name}`);
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   } catch (e) {

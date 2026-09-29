@@ -13,6 +13,9 @@ arguments:
     description: "ID da oportunidade no Harmony (ex: 306358820)"
     required: true
 allowed-tools:
+  - mcp__scrubbing__renew_auth
+  - mcp__scrubbing__harmony_whoami
+  - mcp__scrubbing__dcd_whoami
   - mcp__scrubbing__harmony_opp_read
   - mcp__scrubbing__harmony_opp_list_quotes
   - mcp__scrubbing__harmony_messages_set
@@ -59,7 +62,12 @@ Se invocado sem argumento, perguntar: "Qual é o OPP_ID?"
 
 ## Pré-requisito: verificar auth
 
-Testar com `harmony_opp_read(opp_id)`. Se retornar erro de auth: informar que os cookies SAP expiraram e executar o procedimento de renovação de auth (`node ~/.sap-mcp/auto-renew-auth.mjs` ou procedimento manual).
+Testar com `mcp__scrubbing__harmony_whoami()` e `mcp__scrubbing__dcd_whoami()` em paralelo.
+
+Se qualquer um retornar erro de autenticação (401/403/SAML/fetch failed):
+1. Chamar `mcp__scrubbing__renew_auth()` — sap-auth abre Edge com SSO corporativo automaticamente. Aguardar até ~60s.
+2. Se `ok: true` → repetir whoami e prosseguir.
+3. Se `ok: false` com erro técnico (sem browser, timeout) → pedir ao usuário para abrir o Edge, acessar Harmony e DCD, fazer login SSO, e avisar quando terminar.
 
 ---
 

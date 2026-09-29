@@ -27,16 +27,18 @@ Se o OPP_ID não for informado, perguntar: "Qual é o OPP_ID para scrubbing?"
 
 **Se QUALQUER chamada a qualquer ferramenta retornar erro de autenticação (401 / 403 / CSRF inválido / sessão expirada / fetch failed / SAML redirect) — em QUALQUER fase do scrubbing:**
 
-Informar o usuário e solicitar renovação manual:
+1. Chamar imediatamente: `renew_auth()` ← MCP tool do servidor unificado
+2. Aguardar retorno (até ~60s) — sap-auth abre Edge com SSO corporativo automaticamente
+3. Repetir a chamada que falhou e continuar de onde parou
 
-> "Sessão SAP expirada. Por favor:
+**Se `renew_auth()` retornar `ok: false` com erro técnico** (sem browser, Edge não encontrado, timeout):
+
+> "A renovação automática falhou: [mensagem]. Por favor:
 > 1. Abra o Microsoft Edge
-> 2. Acesse: `https://sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand.com/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm/index.html`
-> 3. Aguarde o login SSO
-> 4. Acesse: `https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html`
+> 2. Acesse Harmony: `https://sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand.com/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm/index.html`
+> 3. Aguarde o login SSO automático
+> 4. Acesse DCD: `https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html`
 > 5. Me avise quando terminar."
-
-Após confirmação → repetir a chamada que falhou e continuar de onde parou.
 
 ---
 
@@ -64,20 +66,31 @@ dcd_whoami()
 - Se ambos retornam OK → prosseguir para FASE 1.
 - Se qualquer um retorna erro (401 / 403 / SAML / fetch failed) → FASE 0.2.
 
-### 0.2 Renovação manual (se qualquer whoami falhar)
+### 0.2 Renovação automática
+
+```
+renew_auth()
+```
+
+`renew_auth` é um MCP tool do servidor unificado — chama sap-auth que abre Edge com SSO corporativo automaticamente. Aguardar até ~60s.
+
+Após conclusão → repetir `harmony_whoami()` + `dcd_whoami()` em paralelo.
+
+- Se OK → prosseguir para FASE 1.
+- Se `renew_auth` retornar `ok: false` com erro técnico → FASE 0.3.
+
+### 0.3 Fallback manual (somente se renew_auth falhar com erro técnico)
 
 Informar o usuário:
 
-> "Sessão SAP expirada. Por favor:
+> "A renovação automática falhou: [mensagem]. Por favor:
 > 1. Abra o Microsoft Edge
 > 2. Acesse Harmony: `https://sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand.com/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm/index.html`
 > 3. Aguarde o login SSO automático
 > 4. Acesse DCD: `https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html`
 > 5. Me avise quando terminar."
 
-Após confirmação → repetir `harmony_whoami()` + `dcd_whoami()` em paralelo.
-
-- Se OK → prosseguir para FASE 1.
+Após confirmação → repetir `harmony_whoami()` + `dcd_whoami()` antes de prosseguir.
 
 ---
 
