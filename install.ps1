@@ -70,14 +70,27 @@ Set-Location $InstallDir
 Write-Host "Instalando dependencias (aguarde ~2 min)..." -ForegroundColor Cyan
 npm install --no-workspaces --legacy-peer-deps --silent
 
-# Windows: instalar deps externas diretamente no pacote principal
-# --no-workspaces ignora workspace deps (* protocol) que causam falha de symlinks
+# Windows: copiar node_modules da raiz para o pacote principal
+# Resolve ERR_MODULE_NOT_FOUND causado por falha de symlinks em ambientes corporativos
 Write-Host "Configurando pacote principal..." -ForegroundColor Cyan
-Set-Location "$InstallDir\packages\servers\scrubbing-mcp"
-npm install --no-workspaces --legacy-peer-deps --silent 2>$null
-if ($LASTEXITCODE -ne 0) {
-    # Fallback: instalar o SDK diretamente
-    npm install @modelcontextprotocol/sdk --no-save --silent 2>$null
+$SrcModules = "$InstallDir\node_modules"
+$DstModules = "$InstallDir\packages\servers\scrubbing-mcp\node_modules"
+if (Test-Path $SrcModules) {
+    if (-not (Test-Path $DstModules)) {
+        New-Item -ItemType Junction -Path $DstModules -Target $SrcModules -ErrorAction SilentlyContinue | Out-Null
+    }
+    if (-not (Test-Path $DstModules)) {
+        # Junction falhou (sem permissao) - copiar apenas os pacotes necessarios
+        New-Item -ItemType Directory -Force -Path $DstModules | Out-Null
+        $essentialPkgs = @("@modelcontextprotocol", "sap-auth", "sap-harmony-mcp", "sap-dcd-mcp", "btp-fetch")
+        foreach ($pkg in $essentialPkgs) {
+            $src = "$SrcModules\$pkg"
+            $dst = "$DstModules\$pkg"
+            if ((Test-Path $src) -and (-not (Test-Path $dst))) {
+                Copy-Item -Recurse -Force $src $dst
+            }
+        }
+    }
 }
 Set-Location $InstallDir
 
