@@ -19,40 +19,42 @@ echo ""
 # ── Verificar Node.js ─────────────────────────────────────────────────────────
 echo "🔍 Verificando Node.js..."
 if ! command -v node &>/dev/null; then
-  echo "   Node.js não encontrado. Instalando automaticamente..."
+  echo "   Node.js não encontrado. Instalando via nvm (sem precisar de admin)..."
 
-  # O .pkg do Node.js é universal (funciona em arm64 e x64)
-  NODE_URL="https://nodejs.org/dist/v20.19.2/node-v20.19.2.pkg"
-  NODE_PKG="node-v20.pkg"
+  # Instalar nvm — não requer sudo, instala em ~/.nvm
+  export NVM_DIR="$HOME/.nvm"
+  if [ ! -d "$NVM_DIR" ]; then
+    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  fi
 
-  echo "   Baixando Node.js..."
-  TMP_PKG="/tmp/$NODE_PKG"
-  curl -fsSL "$NODE_URL" -o "$TMP_PKG"
+  # Carregar nvm na sessão atual
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-  echo "   Instalando Node.js (pode pedir senha de administrador)..."
-  sudo installer -pkg "$TMP_PKG" -target / 2>/dev/null || {
-    echo ""
-    echo "❌ Não foi possível instalar automaticamente (sem permissão de admin)."
-    echo ""
-    echo "   Instale manualmente:"
-    echo "   1. Acesse: https://nodejs.org"
-    echo "   2. Baixe a versão LTS (20 ou superior)"
-    echo "   3. Execute o instalador"
-    echo "   4. Abra um novo Terminal e execute este script novamente"
-    echo ""
-    open "https://nodejs.org" 2>/dev/null || true
-    exit 1
-  }
-  rm -f "$TMP_PKG"
+  # Instalar Node.js 20 LTS
+  echo "   Instalando Node.js 20 LTS (sem permissão de admin necessária)..."
+  nvm install 20
+  nvm use 20
+  nvm alias default 20
 
-  # Adicionar ao PATH da sessão atual
-  export PATH="/usr/local/bin:$PATH"
+  # Adicionar ao PATH permanente no shell do usuário
+  SHELL_RC="$HOME/.zshrc"
+  [ -f "$HOME/.bash_profile" ] && SHELL_RC="$HOME/.bash_profile"
+  if ! grep -q "NVM_DIR" "$SHELL_RC" 2>/dev/null; then
+    echo '' >> "$SHELL_RC"
+    echo 'export NVM_DIR="$HOME/.nvm"' >> "$SHELL_RC"
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> "$SHELL_RC"
+  fi
+fi
+
+# Garantir que nvm está carregado se node não estiver no PATH
+if ! command -v node &>/dev/null; then
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 fi
 
 NODE_VER=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
 if [ -z "$NODE_VER" ] || [ "$NODE_VER" -lt 20 ]; then
   echo "❌ Node.js v20+ necessário. Instale em: https://nodejs.org"
-  open "https://nodejs.org" 2>/dev/null || true
   exit 1
 fi
 echo "   ✓ Node.js $(node -v)"
