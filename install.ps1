@@ -18,7 +18,11 @@ $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeCmd) {
     Write-Host "Node.js nao encontrado. Instalando via winget..." -ForegroundColor Yellow
     try {
-        winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
+        # Instalar Node.js v20 LTS especificamente (v22/v24 tem problemas com workspaces)
+        winget install OpenJS.NodeJS.LTS --version 20.19.2 --silent --accept-package-agreements --accept-source-agreements 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            winget install OpenJS.NodeJS --version 20.19.2 --silent --accept-package-agreements --accept-source-agreements 2>$null
+        }
         $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
         $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
     } catch {}
@@ -38,6 +42,16 @@ if ($nodeMajor -lt 20) {
     Write-Host "ERRO: Node.js v20+ necessario. Voce tem: v$nodeVersion" -ForegroundColor Red
     Write-Host "Atualize em: https://nodejs.org" -ForegroundColor Yellow
     exit 1
+}
+if ($nodeMajor -gt 20) {
+    Write-Host "  AVISO: Node.js v$nodeVersion detectado. Recomendado: v20 LTS." -ForegroundColor Yellow
+    Write-Host "  Instalando Node.js v20 LTS para garantir compatibilidade..." -ForegroundColor Yellow
+    winget install OpenJS.NodeJS.LTS --version 20.19.2 --silent --accept-package-agreements --accept-source-agreements 2>$null
+    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    $nodeVersion = (node -v 2>$null).TrimStart('v')
+    if ($nodeVersion) {
+        $nodeMajor = [int]($nodeVersion.Split('.')[0])
+    }
 }
 Write-Host "  OK Node.js v$nodeVersion" -ForegroundColor Green
 
