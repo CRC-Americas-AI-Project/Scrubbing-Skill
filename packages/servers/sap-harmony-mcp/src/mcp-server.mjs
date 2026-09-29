@@ -369,6 +369,36 @@ const tools = [
     },
   },
   {
+    name: 'harmony_set_renewal_execution_notes',
+    description: 'Write the Renewal Execution section text notes on an opp — HEADLESS, full-entity deep-insert POST. TDIDs verified: obvValidatedNote→ZRE1, gtcDeviationsText→ZRE3, renewalClosePlan→ZRE4, internalRoadblocks→ZRED, upliftRemarks→ZRE6, perAnnumLanguage→ZRE8, redlines→ZREE. All are additive (append, never overwrite). Returns { ok, status, changedNotes, unexpectedChanges }.',
+    inputSchema: {
+      type: 'object',
+      required: ['oppId'],
+      properties: {
+        oppId: { type: 'string', description: 'Opportunity ID, e.g. "306252511".' },
+        obvValidatedNote: { type: 'string', description: 'OBV Validated analysis note (TDID ZRE1). Include predecessor OBV vs current OBV delta.' },
+        gtcDeviationsText: { type: 'string', description: 'GTC Deviations text (TDID ZRE3). Use "- This is an active-renewal contract." for active renewals.' },
+        renewalClosePlan: { type: 'string', description: 'Renewal Close Plan (TDID ZRE4). Include CRE name, AO name, close timeline.' },
+        internalRoadblocks: { type: 'string', description: 'Internal Roadblocks note (TDID ZRED). Include blockers, locked fields, missing documents, etc.' },
+        upliftRemarks: { type: 'string', description: 'Uplift % Remarks (TDID ZRE6). Include IPCA cumulative calculation detail.' },
+        perAnnumLanguage: { type: 'string', description: 'Per Annum Language evidence (TDID ZRE8). Include IPCA clause text from contract.' },
+        redlines: { type: 'string', description: 'Redlines (TDID ZREE). Must be identical copy of gtcDeviationsText per scrubbing rules.' },
+      },
+    },
+  },
+  {
+    name: 'harmony_set_close_date',
+    description: 'Set the opportunity Close Date (EXPECT_END) headlessly — HEADLESS. Checks CLOSE_DATE_EDITABLE first; returns { ok: false, wasEditable: false } without touching the server if the field is locked. Returns { ok, status, wasEditable, closeDateAfter }.',
+    inputSchema: {
+      type: 'object',
+      required: ['oppId', 'date'],
+      properties: {
+        oppId: { type: 'string', description: 'Opportunity ID, e.g. "305988635".' },
+        date: { type: 'string', description: 'New close date in YYYY-MM-DD format, e.g. "2027-08-31".' },
+      },
+    },
+  },
+  {
     name: 'harmony_odata_function',
     description: 'Low-level: invoke a Harmony OData FunctionImport (RPC action). Read-only imports (GetContractsFromOpp, GetOpportunityQuotes, RefreshAccountOwner, NotifyOpptOwner, RedetermineParties) run freely; any POST or non-allowlisted/destructive import (CancelAllQuotes, DiscontinueHDMOpp, CreateDeal, CopyOpportunity, ...) is BLOCKED unless confirmDestructive:true — these hit the live production tenant and are often irreversible. Full list in metadata.xml.',
     inputSchema: {
@@ -551,6 +581,19 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
       case 'harmony_read_renewal_execution': result = await h.readRenewalExecution(args.oppId); break;
       case 'harmony_set_renewal_execution': result = await h.setRenewalExecution(args.oppId, args.patch); break;
+      case 'harmony_set_renewal_execution_notes': {
+        const patch = {};
+        if (args.obvValidatedNote != null) patch.obvValidatedNote = args.obvValidatedNote;
+        if (args.gtcDeviationsText != null) patch.gtcDeviationsText = args.gtcDeviationsText;
+        if (args.renewalClosePlan != null) patch.renewalClosePlan = args.renewalClosePlan;
+        if (args.internalRoadblocks != null) patch.internalRoadblocks = args.internalRoadblocks;
+        if (args.upliftRemarks != null) patch.upliftRemarks = args.upliftRemarks;
+        if (args.perAnnumLanguage != null) patch.perAnnumLanguage = args.perAnnumLanguage;
+        if (args.redlines != null) patch.redlines = args.redlines;
+        result = await h.setRenewalExecutionNotes(args.oppId, patch);
+        break;
+      }
+      case 'harmony_set_close_date': result = await h.setCloseDate(args.oppId, args.date); break;
       case 'harmony_odata_function': result = await h.odataFunction(args.name, args.params, args.method, args.confirmDestructive); break;
       case 'harmony_odata_metadata': result = { xml: (await h.odataMetadata()).slice(0, 40000) }; break;
       // CPQ 2.0 (headless)

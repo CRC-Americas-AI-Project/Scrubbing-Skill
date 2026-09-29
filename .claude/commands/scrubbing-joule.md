@@ -4,7 +4,8 @@ description: >
   Executa scrubbing completo de uma oportunidade SAP: lê Harmony, DCD/CMS,
   baixa e analisa o contrato PDF via pdftotext, valida OBV, calcula IPCA via
   BCB série 433 e preenche todos os campos de Renewal Execution no Harmony.
-  100% headless via MCP — sem Playwright, sem browser.
+  100% headless via MCP Scrubbing unificado (Harmony + DCD em um único servidor).
+  v3.0 — MCP unificado + uplift sempre 3.30% no campo + IPCA somente na nota ZRE6.
   Use quando o usuário disser "scrubbing", "scrub", "analisar oportunidade" ou fornecer um OPP_ID.
 argument-hint: <OPP_ID>
 arguments: [opp_id]
@@ -26,11 +27,16 @@ Se o OPP_ID não for informado, perguntar: "Qual é o OPP_ID para scrubbing?"
 
 **Se QUALQUER chamada a qualquer ferramenta retornar erro de autenticação (401 / 403 / CSRF inválido / sessão expirada / fetch failed / SAML redirect) — em QUALQUER fase do scrubbing:**
 
-1. Chamar imediatamente: `renew_auth()` ← tool disponível no servidor MCP local
-2. Aguardar ~30s até retornar `ok: true`
-3. Repetir a chamada que falhou e continuar de onde parou
+Informar o usuário e solicitar renovação manual:
 
-`renew_auth()` é um MCP tool, não um script de terminal. **NUNCA pedir ao usuário para rodar no CMD.** Se `renew_auth()` falhar com erro técnico, aí sim pedir ajuda ao usuário.
+> "Sessão SAP expirada. Por favor:
+> 1. Abra o Microsoft Edge
+> 2. Acesse: `https://sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand.com/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm/index.html`
+> 3. Aguarde o login SSO
+> 4. Acesse: `https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html`
+> 5. Me avise quando terminar."
+
+Após confirmação → repetir a chamada que falhou e continuar de onde parou.
 
 ---
 
@@ -58,31 +64,20 @@ dcd_whoami()
 - Se ambos retornam OK → prosseguir para FASE 1.
 - Se qualquer um retorna erro (401 / 403 / SAML / fetch failed) → FASE 0.2.
 
-### 0.2 Renovação automática (MCP tool — sem interação do usuário)
-
-```
-renew_auth()
-```
-
-`renew_auth` é um **MCP tool** registrado no servidor local (porta 8811) — não é um comando de terminal. Chamá-lo como qualquer outro tool DCD. Ele abre Edge com SSO corporativo Windows e atualiza os cookies automaticamente. Aguardar ~30s.
-
-Após conclusão → repetir `harmony_whoami()` + `dcd_whoami()` em paralelo.
-
-- Se OK → prosseguir para FASE 1.
-- Se `renew_auth` retornar erro técnico ("connection refused" / timeout) → FASE 0.3.
-
-### 0.3 Fallback manual (somente se renew_auth falhar com erro técnico)
+### 0.2 Renovação manual (se qualquer whoami falhar)
 
 Informar o usuário:
 
-> "A renovação automática falhou com erro: [mensagem]. Por favor:
+> "Sessão SAP expirada. Por favor:
 > 1. Abra o Microsoft Edge
 > 2. Acesse Harmony: `https://sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand.com/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm/index.html`
 > 3. Aguarde o login SSO automático
 > 4. Acesse DCD: `https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html`
 > 5. Me avise quando terminar."
 
-Após confirmação → repetir `harmony_whoami()` + `dcd_whoami()` antes de prosseguir.
+Após confirmação → repetir `harmony_whoami()` + `dcd_whoami()` em paralelo.
+
+- Se OK → prosseguir para FASE 1.
 
 ---
 
@@ -260,7 +255,7 @@ harmony_set_renewal_execution(oppId, patch: {
   obvValidated:    "Y",
   gtcDate:         "YYYY-MM-DD",   ← do rodapé; omitir se SAP Store ou PDF indisponível
   contrUpliftType: "7",            ← "1" se No Increase
-  contrUpliftPc:   "X.XX",
+  contrUpliftPc:   "3.30",         ← sempre 3.30 (campo padrão; IPCA real apenas na ZRE6)
   negUpliftLang:   "Y",            ← Y se IPCA/tributos mencionados
   gtcDeviations:   "N"             ← "Y" se Active Renewal / pagamento atípico / etc.
 })
@@ -304,11 +299,19 @@ harmony_set_renewal_execution_notes(oppId, {
 [Scrubbot, DD/MM/YYYY]
 ```
 
-**ZRE6 (Uplift % Remarks):**
+**ZRE6 (Uplift % Remarks) — Brasil:**
 ```
-- Cumulative IPCA available: X.XX% (N/M months published)
-- Already applied: X.XX%
-- Suggested: X.XX% [partial — pending IBGE: Mmm/YYYY–Mmm/YYYY — update once published]
+- Full duration basis: [N] months ([Start] → [End]) | Lookback: [Start−6m] → [End−6m]
+- Total cumulative IPCA: X.XX% ([N] months, [Mmm/YYYY]–[Mmm/YYYY])
+- Already applied: X.XX% (PDF OBV: BRL [valor] → Harmony OBV: BRL [valor])
+- Suggested to apply on renewal: X.XX% [partial — pending IBGE: Mmm/YYYY–Mmm/YYYY]
+- Note: 3.30% entered in Harmony uplift field is the standard placeholder; real suggested rate above
+[Scrubbot, DD/MM/YYYY]
+```
+
+**ZRE6 (Uplift % Remarks) — LATAM / outros países:**
+```
+- Contractual flat rate: 3.30% per annum (fixed rate per contract terms — no BCB calculation)
 [Scrubbot, DD/MM/YYYY]
 ```
 
@@ -347,7 +350,7 @@ SCRUBBING CONCLUÍDO — OPP [oppId]
 • Renewal Type: [Auto / Active]
 • Vencimento: [data] | Close Date: [data] (D-30)
 • OBV PDF: BRL [valor] → OBV Harmony: BRL [valor] ([delta%])
-• IPCA total: [X.XX%] | Já aplicado: [X.XX%] | Sugerido: [X.XX%] [parcial se aplicável]
+• IPCA total: [X.XX%] | Já aplicado: [X.XX%] | Sugerido: [X.XX%] [parcial se aplicável] — campo Harmony: 3.30% (padrão)
 • OBV alvo renovação: BRL [valor]
 • GTC: ptBR.v.[X]-[YYYY] → [data] | Deviations: [N / resumo]
 
