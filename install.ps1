@@ -69,7 +69,13 @@ if (Test-Path "$InstallDir\.git") {
 Set-Location $InstallDir
 Write-Host "Instalando dependencias (aguarde ~2 min)..." -ForegroundColor Cyan
 npm install --silent
-# dist/ dos shared packages ja estao no repositorio - build nao necessario
+
+# Windows: instalar deps diretamente no pacote principal
+# Evita problema de symlinks em ambientes corporativos sem Developer Mode
+Write-Host "Configurando pacote principal..." -ForegroundColor Cyan
+Set-Location "$InstallDir\packages\servers\scrubbing-mcp"
+npm install --silent
+Set-Location $InstallDir
 
 # Criar launcher .bat na area de trabalho
 # Suporta Desktop padrao e Desktop com OneDrive (SAP e outros)
