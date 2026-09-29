@@ -1,6 +1,11 @@
 # Dependências
 node_modules/
-dist/
+
+# dist/ de servers (gerado localmente, não necessário no repo)
+packages/servers/*/dist/
+
+# dist/ dos shared packages é commitado para evitar necessidade de tsc na instalação
+# (não adicionar 'dist/' global aqui)
 
 # Logs
 *.log

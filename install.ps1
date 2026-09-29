@@ -69,12 +69,34 @@ if (Test-Path "$InstallDir\.git") {
 Set-Location $InstallDir
 Write-Host "Instalando dependencias (aguarde ~2 min)..." -ForegroundColor Cyan
 npm install --silent
-npm run build:shared --silent 2>$null
+# dist/ dos shared packages ja estao no repositorio - build nao necessario
 
 # Criar launcher .bat na area de trabalho
-$BatLauncher = "$env:USERPROFILE\Desktop\SAP Scrubbing MCP.bat"
+# Suporta Desktop padrao e Desktop com OneDrive (SAP e outros)
+$DesktopPath = $null
+$DesktopCandidates = @(
+    [System.Environment]::GetFolderPath("Desktop"),
+    "$env:USERPROFILE\Desktop",
+    "$env:USERPROFILE\OneDrive\Desktop",
+    "$env:USERPROFILE\OneDrive - SAP SE\Desktop",
+    "$env:OneDriveCommercial\Desktop",
+    "$env:OneDrive\Desktop"
+)
+foreach ($candidate in $DesktopCandidates) {
+    if ($candidate -and (Test-Path $candidate)) {
+        $DesktopPath = $candidate
+        break
+    }
+}
+if (-not $DesktopPath) {
+    $DesktopPath = "$env:USERPROFILE\Desktop"
+    New-Item -ItemType Directory -Force -Path $DesktopPath | Out-Null
+}
+
+$BatLauncher = "$DesktopPath\SAP Scrubbing MCP.bat"
 $batContent = "@echo off`r`ntitle SAP Scrubbing MCP`r`ncd /d `"$InstallDir`"`r`necho.`r`necho   SAP Scrubbing MCP`r`necho   URL: http://localhost:$Port/mcp`r`necho   Pressione Ctrl+C para encerrar.`r`necho.`r`nset PORT=$Port`r`nnode packages\servers\scrubbing-mcp\src\mcp-server-http.mjs`r`npause"
 [System.IO.File]::WriteAllText($BatLauncher, $batContent, [System.Text.Encoding]::ASCII)
+Write-Host "  OK Atalho criado em: $BatLauncher" -ForegroundColor Green
 
 # Configurar auto-start no login (Task Scheduler)
 Write-Host ""

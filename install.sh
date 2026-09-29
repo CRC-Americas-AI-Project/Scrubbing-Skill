@@ -19,26 +19,35 @@ echo ""
 # ── Verificar Node.js ─────────────────────────────────────────────────────────
 echo "🔍 Verificando Node.js..."
 if ! command -v node &>/dev/null; then
-  echo ""
-  echo "❌ Node.js não encontrado."
-  echo "   Instale a versão 20 ou superior em: https://nodejs.org"
-  echo ""
-  open "https://nodejs.org" 2>/dev/null || true
-  exit 1
+  echo "   Node.js não encontrado. Instalando automaticamente..."
+  if ! command -v brew &>/dev/null; then
+    echo "   Instalando Homebrew primeiro..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Adicionar Homebrew ao PATH para Apple Silicon
+    eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || eval "$(/usr/local/bin/brew shellenv)" 2>/dev/null || true
+  fi
+  brew install node
 fi
 
 NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
 if [ "$NODE_VER" -lt 20 ]; then
-  echo "❌ Node.js v20+ necessário. Você tem: $(node -v)"
-  echo "   Atualize em: https://nodejs.org"
-  exit 1
+  echo "   Node.js $(node -v) encontrado, atualizando para v20+..."
+  brew upgrade node 2>/dev/null || brew install node@20
 fi
 echo "   ✓ Node.js $(node -v)"
 
 # ── Verificar Git ─────────────────────────────────────────────────────────────
 if ! command -v git &>/dev/null; then
-  echo "❌ git não encontrado. Instale em: https://git-scm.com"
-  exit 1
+  echo "   Git não encontrado. Instalando via Xcode Command Line Tools..."
+  xcode-select --install 2>/dev/null || true
+  echo "   Se aparecer uma janela de instalação, conclua e execute este script novamente."
+  # Tentar via Homebrew como alternativa
+  if command -v brew &>/dev/null; then
+    brew install git
+  else
+    echo "❌ Por favor instale o git e execute novamente: https://git-scm.com"
+    exit 1
+  fi
 fi
 
 # ── Clonar ou atualizar ───────────────────────────────────────────────────────
@@ -54,7 +63,7 @@ fi
 cd "$INSTALL_DIR"
 echo "📥 Instalando dependências..."
 npm install --silent
-npm run build:shared --silent 2>/dev/null || true
+# dist/ dos shared packages já estão no repositório — build não necessário
 
 # ── Criar script de start ─────────────────────────────────────────────────────
 START_SCRIPT="$INSTALL_DIR/start-mac.sh"
