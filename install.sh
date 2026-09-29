@@ -21,17 +21,11 @@ echo "🔍 Verificando Node.js..."
 if ! command -v node &>/dev/null; then
   echo "   Node.js não encontrado. Instalando automaticamente..."
 
-  # Detectar arquitetura
-  ARCH=$(uname -m)
-  if [ "$ARCH" = "arm64" ]; then
-    NODE_PKG="node-v20.18.0-pkg-arm64.pkg"
-    NODE_URL="https://nodejs.org/dist/v20.18.0/node-v20.18.0-arm64.pkg"
-  else
-    NODE_PKG="node-v20.18.0-pkg-x64.pkg"
-    NODE_URL="https://nodejs.org/dist/v20.18.0/node-v20.18.0-x64.pkg"
-  fi
+  # O .pkg do Node.js é universal (funciona em arm64 e x64)
+  NODE_URL="https://nodejs.org/dist/v20.19.2/node-v20.19.2.pkg"
+  NODE_PKG="node-v20.pkg"
 
-  echo "   Baixando Node.js ($ARCH)..."
+  echo "   Baixando Node.js..."
   TMP_PKG="/tmp/$NODE_PKG"
   curl -fsSL "$NODE_URL" -o "$TMP_PKG"
 
