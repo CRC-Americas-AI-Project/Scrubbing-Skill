@@ -20,19 +20,46 @@ echo ""
 echo "🔍 Verificando Node.js..."
 if ! command -v node &>/dev/null; then
   echo "   Node.js não encontrado. Instalando automaticamente..."
-  if ! command -v brew &>/dev/null; then
-    echo "   Instalando Homebrew primeiro..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # Adicionar Homebrew ao PATH para Apple Silicon
-    eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || eval "$(/usr/local/bin/brew shellenv)" 2>/dev/null || true
+
+  # Detectar arquitetura
+  ARCH=$(uname -m)
+  if [ "$ARCH" = "arm64" ]; then
+    NODE_PKG="node-v20.18.0-pkg-arm64.pkg"
+    NODE_URL="https://nodejs.org/dist/v20.18.0/node-v20.18.0-arm64.pkg"
+  else
+    NODE_PKG="node-v20.18.0-pkg-x64.pkg"
+    NODE_URL="https://nodejs.org/dist/v20.18.0/node-v20.18.0-x64.pkg"
   fi
-  brew install node
+
+  echo "   Baixando Node.js ($ARCH)..."
+  TMP_PKG="/tmp/$NODE_PKG"
+  curl -fsSL "$NODE_URL" -o "$TMP_PKG"
+
+  echo "   Instalando Node.js (pode pedir senha de administrador)..."
+  sudo installer -pkg "$TMP_PKG" -target / 2>/dev/null || {
+    echo ""
+    echo "❌ Não foi possível instalar automaticamente (sem permissão de admin)."
+    echo ""
+    echo "   Instale manualmente:"
+    echo "   1. Acesse: https://nodejs.org"
+    echo "   2. Baixe a versão LTS (20 ou superior)"
+    echo "   3. Execute o instalador"
+    echo "   4. Abra um novo Terminal e execute este script novamente"
+    echo ""
+    open "https://nodejs.org" 2>/dev/null || true
+    exit 1
+  }
+  rm -f "$TMP_PKG"
+
+  # Adicionar ao PATH da sessão atual
+  export PATH="/usr/local/bin:$PATH"
 fi
 
-NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
-if [ "$NODE_VER" -lt 20 ]; then
-  echo "   Node.js $(node -v) encontrado, atualizando para v20+..."
-  brew upgrade node 2>/dev/null || brew install node@20
+NODE_VER=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
+if [ -z "$NODE_VER" ] || [ "$NODE_VER" -lt 20 ]; then
+  echo "❌ Node.js v20+ necessário. Instale em: https://nodejs.org"
+  open "https://nodejs.org" 2>/dev/null || true
+  exit 1
 fi
 echo "   ✓ Node.js $(node -v)"
 
