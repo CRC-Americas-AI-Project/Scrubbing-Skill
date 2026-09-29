@@ -68,13 +68,17 @@ if (Test-Path "$InstallDir\.git") {
 
 Set-Location $InstallDir
 Write-Host "Instalando dependencias (aguarde ~2 min)..." -ForegroundColor Cyan
-npm install --silent
+npm install --no-workspaces --legacy-peer-deps --silent
 
-# Windows: instalar deps diretamente no pacote principal
-# Evita problema de symlinks em ambientes corporativos sem Developer Mode
+# Windows: instalar deps externas diretamente no pacote principal
+# --no-workspaces ignora workspace deps (* protocol) que causam falha de symlinks
 Write-Host "Configurando pacote principal..." -ForegroundColor Cyan
 Set-Location "$InstallDir\packages\servers\scrubbing-mcp"
-npm install --silent
+npm install --no-workspaces --legacy-peer-deps --silent 2>$null
+if ($LASTEXITCODE -ne 0) {
+    # Fallback: instalar o SDK diretamente
+    npm install @modelcontextprotocol/sdk --no-save --silent 2>$null
+}
 Set-Location $InstallDir
 
 # Criar launcher .bat na area de trabalho
