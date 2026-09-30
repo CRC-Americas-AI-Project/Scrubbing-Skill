@@ -4,6 +4,17 @@
 // Each instance gets its own HOME directory so sap-auth stores cookies in isolation.
 // On BTP, BTP_USER_JWT is set in env and forwarded to the clients for Principal Propagation.
 
+import { homedir } from 'os';
+import { join }    from 'path';
+
+// Persistent browser profile — enables cross-session SSO cookie reuse on Windows + macOS.
+// First auth: visible browser opens for manual login (user logs in once, profile saved).
+// Subsequent auths: browser loads saved session, headless success — no user interaction needed.
+if (!process.env.BROWSER_USER_DATA_DIR) {
+  const home = process.env.HOME ?? homedir();
+  process.env.BROWSER_USER_DATA_DIR = join(home, '.sap-mcp', 'browser-profile');
+}
+
 import { Server }              from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -48,8 +59,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args = {} } = req.params;
   try {
     let result;
-    if (name.startsWith('harmony_'))      result = await dispatchHarmony(name, args);
-    else if (name.startsWith('dcd_'))     result = await dispatchDcd(name, args);
+    if (name === 'renew_auth')             result = await dispatchHarmony(name, args);
+    else if (name.startsWith('harmony_'))  result = await dispatchHarmony(name, args);
+    else if (name.startsWith('dcd_'))      result = await dispatchDcd(name, args);
     else throw new Error(`Unknown tool: ${name}`);
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   } catch (e) {

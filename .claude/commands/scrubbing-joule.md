@@ -4,7 +4,8 @@ description: >
   Executa scrubbing completo de uma oportunidade SAP: lê Harmony, DCD/CMS,
   baixa e analisa o contrato PDF via pdftotext, valida OBV, calcula IPCA via
   BCB série 433 e preenche todos os campos de Renewal Execution no Harmony.
-  100% headless via MCP — sem Playwright, sem browser.
+  100% headless via MCP Scrubbing unificado (Harmony + DCD em um único servidor).
+  v3.0 — MCP unificado + uplift sempre 3.30% no campo + IPCA somente na nota ZRE6.
   Use quando o usuário disser "scrubbing", "scrub", "analisar oportunidade" ou fornecer um OPP_ID.
 argument-hint: <OPP_ID>
 arguments: [opp_id]
@@ -26,11 +27,18 @@ Se o OPP_ID não for informado, perguntar: "Qual é o OPP_ID para scrubbing?"
 
 **Se QUALQUER chamada a qualquer ferramenta retornar erro de autenticação (401 / 403 / CSRF inválido / sessão expirada / fetch failed / SAML redirect) — em QUALQUER fase do scrubbing:**
 
-1. Chamar imediatamente: `renew_auth()` ← tool disponível no servidor MCP local
-2. Aguardar ~30s até retornar `ok: true`
+1. Chamar imediatamente: `renew_auth()` ← MCP tool do servidor unificado
+2. Aguardar retorno (até ~60s) — sap-auth abre Edge com SSO corporativo automaticamente
 3. Repetir a chamada que falhou e continuar de onde parou
 
-`renew_auth()` é um MCP tool, não um script de terminal. **NUNCA pedir ao usuário para rodar no CMD.** Se `renew_auth()` falhar com erro técnico, aí sim pedir ajuda ao usuário.
+**Se `renew_auth()` retornar `ok: false` com erro técnico** (sem browser, Edge não encontrado, timeout):
+
+> "A renovação automática falhou: [mensagem]. Por favor:
+> 1. Abra o Microsoft Edge
+> 2. Acesse Harmony: `https://sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand.com/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm/index.html`
+> 3. Aguarde o login SSO automático
+> 4. Acesse DCD: `https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html`
+> 5. Me avise quando terminar."
 
 ---
 
@@ -58,24 +66,24 @@ dcd_whoami()
 - Se ambos retornam OK → prosseguir para FASE 1.
 - Se qualquer um retorna erro (401 / 403 / SAML / fetch failed) → FASE 0.2.
 
-### 0.2 Renovação automática (MCP tool — sem interação do usuário)
+### 0.2 Renovação automática
 
 ```
 renew_auth()
 ```
 
-`renew_auth` é um **MCP tool** registrado no servidor local (porta 8811) — não é um comando de terminal. Chamá-lo como qualquer outro tool DCD. Ele abre Edge com SSO corporativo Windows e atualiza os cookies automaticamente. Aguardar ~30s.
+`renew_auth` é um MCP tool do servidor unificado — chama sap-auth que abre Edge com SSO corporativo automaticamente. Aguardar até ~60s.
 
 Após conclusão → repetir `harmony_whoami()` + `dcd_whoami()` em paralelo.
 
 - Se OK → prosseguir para FASE 1.
-- Se `renew_auth` retornar erro técnico ("connection refused" / timeout) → FASE 0.3.
+- Se `renew_auth` retornar `ok: false` com erro técnico → FASE 0.3.
 
 ### 0.3 Fallback manual (somente se renew_auth falhar com erro técnico)
 
 Informar o usuário:
 
-> "A renovação automática falhou com erro: [mensagem]. Por favor:
+> "A renovação automática falhou: [mensagem]. Por favor:
 > 1. Abra o Microsoft Edge
 > 2. Acesse Harmony: `https://sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand.com/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm/index.html`
 > 3. Aguarde o login SSO automático
@@ -202,16 +210,18 @@ Extrair obrigatoriamente:
 
 ## FASE 5 — Cálculo IPCA via BCB
 
+> **REGRA ABSOLUTA:** NUNCA usar WebSearch, WebFetch, browser ou qualquer busca online para obter índices IPCA. SEMPRE e exclusivamente Bash + API BCB abaixo. Uma única chamada Bash por predecessor, cobrindo o período completo — NUNCA fazer chamadas individuais por mês ou por ano.
+
 ```
 Lookback = (Contract Start − 6 meses) → (Contract End − 6 meses)
 ```
 
-Chamar API BCB série 433:
+Chamar API BCB série 433 — **uma única chamada por predecessor, cobrindo todo o período:**
 ```
 https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY
 ```
 
-Via Node.js (Windows não tem `/dev/stdin`):
+Via Node.js (único método válido — Windows e macOS):
 ```bash
 node -e "
 fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY')
@@ -232,6 +242,8 @@ Calcular: `((1+m1) × (1+m2) × ... × (1+mN)) − 1`
 
 Meses não publicados → valor parcial + registrar range pendente em ZRE6.
 
+**Se a API BCB falhar** (timeout, sem conectividade) → registrar flag "IPCA pendente — BCB indisponível" no relatório e continuar o scrubbing. Não tentar alternativas via web.
+
 ---
 
 ## FASE 6 — Preencher o Harmony
@@ -248,6 +260,8 @@ harmony_set_opp_description(oppId, text: "#[HASHTAG] [Cliente] Q[N]-[YY]")
 harmony_set_close_date(oppId, date: "YYYY-MM-DD")  ← PREV_CONTR_ITEM_END_DATE − 30 dias
 ```
 `CLOSE_DATE_EDITABLE: false` não impede a escrita — sempre chamar.
+- `ok: true` (mesmo com `wasEditable: false`) → atualizado com sucesso
+- `ok: false` (backend rejeitou) → registrar no relatório como ação manual incluindo o texto de `errorMessage` da resposta
 
 ### 6.2 Risk Retention Lever
 ```
@@ -260,7 +274,7 @@ harmony_set_renewal_execution(oppId, patch: {
   obvValidated:    "Y",
   gtcDate:         "YYYY-MM-DD",   ← do rodapé; omitir se SAP Store ou PDF indisponível
   contrUpliftType: "7",            ← "1" se No Increase
-  contrUpliftPc:   "X.XX",
+  contrUpliftPc:   "3.30",         ← sempre 3.30 (campo padrão; IPCA real apenas na ZRE6)
   negUpliftLang:   "Y",            ← Y se IPCA/tributos mencionados
   gtcDeviations:   "N"             ← "Y" se Active Renewal / pagamento atípico / etc.
 })
@@ -304,11 +318,19 @@ harmony_set_renewal_execution_notes(oppId, {
 [Scrubbot, DD/MM/YYYY]
 ```
 
-**ZRE6 (Uplift % Remarks):**
+**ZRE6 (Uplift % Remarks) — Brasil:**
 ```
-- Cumulative IPCA available: X.XX% (N/M months published)
-- Already applied: X.XX%
-- Suggested: X.XX% [partial — pending IBGE: Mmm/YYYY–Mmm/YYYY — update once published]
+- Full duration basis: [N] months ([Start] → [End]) | Lookback: [Start−6m] → [End−6m]
+- Total cumulative IPCA: X.XX% ([N] months, [Mmm/YYYY]–[Mmm/YYYY])
+- Already applied: X.XX% (PDF OBV: BRL [valor] → Harmony OBV: BRL [valor])
+- Suggested to apply on renewal: X.XX% [partial — pending IBGE: Mmm/YYYY–Mmm/YYYY]
+- Note: 3.30% entered in Harmony uplift field is the standard placeholder; real suggested rate above
+[Scrubbot, DD/MM/YYYY]
+```
+
+**ZRE6 (Uplift % Remarks) — LATAM / outros países:**
+```
+- Contractual flat rate: 3.30% per annum (fixed rate per contract terms — no BCB calculation)
 [Scrubbot, DD/MM/YYYY]
 ```
 
@@ -332,7 +354,7 @@ harmony_set_renewal_execution_notes(oppId, {
 
 ### Ações manuais (não automatizáveis — registrar no relatório)
 
-- **Renewal Type:** alterar manualmente na UI Harmony para Auto/Active Renewal
+- **Renewal Type:** registrar como ação manual **somente** se o PDF indicar **Active Renewal**. Se PDF = Auto Renewal (padrão), **não gerar esta flag**.
 - **Incremental Increase Block:** definir Increase Type + Increase % por item na UI Harmony
 
 ---
@@ -347,7 +369,7 @@ SCRUBBING CONCLUÍDO — OPP [oppId]
 • Renewal Type: [Auto / Active]
 • Vencimento: [data] | Close Date: [data] (D-30)
 • OBV PDF: BRL [valor] → OBV Harmony: BRL [valor] ([delta%])
-• IPCA total: [X.XX%] | Já aplicado: [X.XX%] | Sugerido: [X.XX%] [parcial se aplicável]
+• IPCA total: [X.XX%] | Já aplicado: [X.XX%] | Sugerido: [X.XX%] [parcial se aplicável] — campo Harmony: 3.30% (padrão)
 • OBV alvo renovação: BRL [valor]
 • GTC: ptBR.v.[X]-[YYYY] → [data] | Deviations: [N / resumo]
 
@@ -356,7 +378,8 @@ CAMPOS ATUALIZADOS
 ✓ Uplift Type / ✓ Uplift % / ✓ Per Annum Language / ✓ ZRE1 / ✓ ZRE4 / ✓ ZRE6 / ✓ ZRE8
 
 AÇÕES MANUAIS
-⚠ Renewal Type: definir na UI Harmony
+⚠ Renewal Type: definir como Active Renewal na UI Harmony  ← incluir SOMENTE se PDF = Active Renewal
+⚠ Close Date: definir como [data] na UI Harmony — SAP backend rejeitou: [errorMessage]  ← incluir SOMENTE se ok: false
 ⚠ Incremental Increase Block: CPI Per Annum + [X.XX%] por item na UI
 
 FLAGS

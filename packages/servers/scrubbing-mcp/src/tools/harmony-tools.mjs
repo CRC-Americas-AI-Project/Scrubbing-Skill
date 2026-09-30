@@ -13,6 +13,11 @@ async function cpq() {
 
 export const HARMONY_TOOLS = [
   {
+    name: 'renew_auth',
+    description: 'Renova os cookies SAP (Harmony + DCD) via sap-auth SSO. Chamar IMEDIATAMENTE quando harmony_whoami ou dcd_whoami retornar erro de autenticação (401/403/SAML/CSRF/fetch failed). O sap-auth abre Edge/Chrome automaticamente com SSO corporativo Windows. Aguardar até ~60s. Após conclusão, repetir whoami para confirmar.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'harmony_whoami',
     description: 'Returns the currently authenticated Harmony user. Cheap end-to-end auth check via shared sap-auth (headless SSO). First call if anything else auth-errors.',
     inputSchema: { type: 'object', properties: {} },
@@ -353,6 +358,36 @@ export const HARMONY_TOOLS = [
     },
   },
   {
+    name: 'harmony_set_renewal_execution_notes',
+    description: 'Write the Renewal Execution section text notes on an opp — HEADLESS, full-entity deep-insert POST. TDIDs verified: obvValidatedNote→ZRE1, gtcDeviationsText→ZRE3, renewalClosePlan→ZRE4, internalRoadblocks→ZRED, upliftRemarks→ZRE6, perAnnumLanguage→ZRE8, redlines→ZREE. All are additive (append, never overwrite). Returns { ok, status, changedNotes, unexpectedChanges }.',
+    inputSchema: {
+      type: 'object',
+      required: ['oppId'],
+      properties: {
+        oppId: { type: 'string', description: 'Opportunity ID, e.g. "306252511".' },
+        obvValidatedNote: { type: 'string', description: 'OBV Validated analysis note (TDID ZRE1). Include predecessor OBV vs current OBV delta.' },
+        gtcDeviationsText: { type: 'string', description: 'GTC Deviations text (TDID ZRE3). Use "- This is an active-renewal contract." for active renewals.' },
+        renewalClosePlan: { type: 'string', description: 'Renewal Close Plan (TDID ZRE4). Include CRE name, AO name, close timeline.' },
+        internalRoadblocks: { type: 'string', description: 'Internal Roadblocks note (TDID ZRED). Include blockers, locked fields, missing documents, etc.' },
+        upliftRemarks: { type: 'string', description: 'Uplift % Remarks (TDID ZRE6). Include IPCA cumulative calculation detail.' },
+        perAnnumLanguage: { type: 'string', description: 'Per Annum Language evidence (TDID ZRE8). Include IPCA clause text from contract.' },
+        redlines: { type: 'string', description: 'Redlines (TDID ZREE). Must be identical copy of gtcDeviationsText per scrubbing rules.' },
+      },
+    },
+  },
+  {
+    name: 'harmony_set_close_date',
+    description: 'Set the opportunity Close Date (EXPECT_END) headlessly — HEADLESS. Checks CLOSE_DATE_EDITABLE first; if locked returns { ok: false, wasEditable: false } without touching the server. Returns { ok, status, wasEditable, closeDateAfter, errorMessage? }. errorMessage is populated with the SAP backend error text when ok: false.',
+    inputSchema: {
+      type: 'object',
+      required: ['oppId', 'date'],
+      properties: {
+        oppId: { type: 'string', description: 'Opportunity ID, e.g. "305988635".' },
+        date: { type: 'string', description: 'New close date in YYYY-MM-DD format, e.g. "2027-08-31".' },
+      },
+    },
+  },
+  {
     name: 'harmony_odata_function',
     description: 'Low-level: invoke a Harmony OData FunctionImport (RPC action). Read-only imports run freely; destructive imports (CancelAllQuotes, DiscontinueHDMOpp, CreateDeal, CopyOpportunity, ...) are BLOCKED unless confirmDestructive:true.',
     inputSchema: {
@@ -446,6 +481,7 @@ export const HARMONY_TOOLS = [
 
 export async function dispatchHarmony(name, args) {
   switch (name) {
+    case 'renew_auth': return h.renewAuth();
     case 'harmony_whoami': return h.whoami();
     case 'harmony_quote_permissions': return h.quotePermissions(args.quoteCompositeNumber);
     case 'harmony_quote_read': return h.quoteRead(args.quoteCompositeNumber, args.param);
@@ -520,6 +556,8 @@ export async function dispatchHarmony(name, args) {
     }
     case 'harmony_read_renewal_execution': return h.readRenewalExecution(args.oppId);
     case 'harmony_set_renewal_execution': return h.setRenewalExecution(args.oppId, args.patch);
+    case 'harmony_set_renewal_execution_notes': return h.setRenewalExecutionNotes(args.oppId, args);
+    case 'harmony_set_close_date': return h.setCloseDate(args.oppId, args.date);
     case 'harmony_odata_function': return h.odataFunction(args.name, args.params, args.method, args.confirmDestructive);
     case 'harmony_odata_metadata': return { xml: (await h.odataMetadata()).slice(0, 40000) };
     case 'harmony_cpq2_list_quotes': return h.cpq2ListQuotes(args.oppId);

@@ -15,7 +15,7 @@
 // see cpq-client.mjs — that path has separate auth and MUST NOT import
 // sap-auth (its process manager would kill the user's CDP Chrome).
 
-import { createAuthClient } from 'sap-auth';
+import { createAuthClient, AuthManager } from 'sap-auth';
 import { isBtp, btpFetch } from 'btp-fetch';
 import {
   toQuarterId, decodeOppRow, RENEWAL_SOURCE_CODES, RENEWAL_SOURCE_CODES_CLOUD,
@@ -1341,6 +1341,130 @@ export async function setRenewalExecution(oppId, patch = {}) {
   };
 }
 
+// TDIDs for the Renewal Execution section text notes (distinct from Risk Qualification).
+// Verified live on OPP 305942006 (2026-08-27) and OPP 305988635 (2026-09-09).
+const RENEWAL_EXEC_NOTE_TDID = {
+  obvValidatedNote:    'ZRE1',
+  gtcDeviationsText:   'ZRE3',
+  renewalClosePlan:    'ZRE4',
+  internalRoadblocks:  'ZRED',
+  upliftRemarks:       'ZRE6',
+  perAnnumLanguage:    'ZRE8',
+  redlines:            'ZREE',
+};
+
+/**
+ * Set the opportunity Close Date (EXPECT_END) headlessly.
+ * Checks CLOSE_DATE_EDITABLE first; returns { ok: false, wasEditable: false }
+ * without touching the server if the field is locked.
+ */
+export async function setCloseDate(oppId, dateStr) {
+  const entity = await readCleanOppEntity(oppId);
+  if (!entity) return { ok: false, status: 0, reason: 'could not read opportunity' };
+  const wasEditable = !!entity.CLOSE_DATE_EDITABLE;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const ms = Date.UTC(y, m - 1, d);
+  entity.EXPECT_END = `/Date(${ms})/`;
+  entity.CHANGE_FLAGS = { ...(entity.CHANGE_FLAGS || {}), EXPECT_END: 'X' };
+
+  const res = await odataCreate('Opportunities', entity);
+  const echo = res.body?.d;
+  const errorMessage = res.ok ? undefined
+    : (res.body?.error?.message?.value
+        ?? (typeof res.body?.error?.message === 'string' ? res.body.error.message : null)
+        ?? (res.body ? JSON.stringify(res.body).slice(0, 300) : `HTTP ${res.status}`));
+  return {
+    ok: res.ok,
+    status: res.status,
+    wasEditable,
+    closeDateAfter: echo?.EXPECT_END ?? null,
+    ...(errorMessage !== undefined ? { errorMessage } : {}),
+    body: res.ok ? undefined : res.body,
+  };
+}
+
+/**
+ * Write Renewal Execution section text notes (ZRE1/ZRE3/ZRE4/ZRED/ZRE6/ZRE8/ZREE)
+ * headlessly via full-entity deep-insert POST — same mechanism as setRiskNotes.
+ * All are additive (never overwrite). Returns { ok, status, changedNotes, unexpectedChanges }.
+ */
+export async function setRenewalExecutionNotes(oppId, patch = {}) {
+  const edits = {};
+  for (const [key, value] of Object.entries(patch)) {
+    const tdid = RENEWAL_EXEC_NOTE_TDID[key];
+    if (!tdid) return { ok: false, status: 0, reason: `unknown field "${key}" — only ${Object.keys(RENEWAL_EXEC_NOTE_TDID).join(', ')} are writable` };
+    if (value == null || String(value).trim() === '') {
+      return { ok: false, status: 0, reason: `"${key}" must be a non-empty note` };
+    }
+    edits[tdid] = String(value);
+  }
+  if (Object.keys(edits).length === 0) return { ok: false, status: 0, reason: 'empty patch' };
+
+  const targets = Object.keys(edits);
+  const first = await readOppEntityWithNotes(oppId);
+  if (!first) return { ok: false, status: 0, reason: 'could not read opportunity' };
+
+  const before = first.entity;
+  const beforeNotes = notesByTdid(first.notes);
+
+  const seenTdids = new Set();
+  for (const n of first.notes) {
+    if (NOTE_WRITE_NOISE_TDIDS.has(n.TDID)) continue;
+    if (seenTdids.has(n.TDID)) {
+      return { ok: false, status: 0, reason: `duplicate content TDID "${n.TDID}" on opp — refusing to write` };
+    }
+    seenTdids.add(n.TDID);
+  }
+
+  if (!before.IS_EDITABLE) return { ok: false, status: 0, reason: 'opportunity is not editable' };
+
+  const notes = first.notes.map((n) => ({ ...n }));
+  const sibling = notes.find((n) => !NOTE_WRITE_NOISE_TDIDS.has(n.TDID)) ?? notes[0];
+  for (const [tdid, text] of Object.entries(edits)) {
+    const row = notes.find((n) => n.TDID === tdid);
+    if (row) {
+      row.CONC_LINES = text;
+    } else if (sibling) {
+      notes.push({ TDID: tdid, CONC_LINES: text, OBJECT_ID: sibling.OBJECT_ID, TDNAME: sibling.TDNAME, TDOBJECT: sibling.TDOBJECT, TDSPRAS: sibling.TDSPRAS });
+    } else {
+      const derived = { OBJECT_ID: oppId, TDNAME: before.GUID?.replace(/-/g, '').toUpperCase() ?? oppId, TDOBJECT: 'CRM_ORDERH', TDSPRAS: 'EN' };
+      notes.push({ TDID: tdid, CONC_LINES: text, ...derived });
+    }
+  }
+
+  const payload = { ...before, Notes: notes };
+  const res = await odataCreate('Opportunities', payload);
+
+  const second = await readOppEntityWithNotes(oppId);
+  const after = second ? second.entity : null;
+  const afterNotes = second ? notesByTdid(second.notes) : {};
+
+  const allTdids = new Set([...Object.keys(beforeNotes), ...Object.keys(afterNotes)]);
+  const changedNotes = [...allTdids]
+    .filter((t) => (beforeNotes[t] ?? '') !== (afterNotes[t] ?? ''))
+    .filter((t) => !NOTE_WRITE_NOISE_TDIDS.has(t));
+
+  const ALLOWED_TOP = new Set(['ERROR', 'CHANGED_AT', 'LAST_UPDATED_ON', 'STATUS_SINCE', 'TIME_STAMP', 'SESSION_GUID', 'DATA_CENTER']);
+  const topChanged = after ? Object.keys(before).filter((f) => !ALLOWED_TOP.has(f) && String(before[f] ?? '') !== String(after[f] ?? '')) : [];
+  const unexpectedNotes = changedNotes.filter((t) => !targets.includes(t));
+  const unexpectedChanges = [...unexpectedNotes, ...topChanged.filter((f) => !ALLOWED_TOP.has(f))];
+
+  const missingTargets = targets.filter((t) => (afterNotes[t] ?? '') !== edits[t]);
+  const silentNoOp = res.ok && missingTargets.length > 0;
+  const ok = res.ok && !silentNoOp && unexpectedChanges.length === 0;
+
+  return {
+    ok,
+    status: res.status,
+    silentNoOp: silentNoOp || undefined,
+    expected: Object.fromEntries(targets.map((t) => [t, edits[t]])),
+    actual: Object.fromEntries(targets.map((t) => [t, afterNotes[t] ?? ''])),
+    changedNotes,
+    unexpectedChanges,
+    ...(res.ok ? {} : { body: res.body }),
+  };
+}
+
 /**
  * Access gate for odataFunction / harmony_odata_function.
  *
@@ -1524,3 +1648,32 @@ export async function cpq2ExecuteAction(shortQuoteId, actionId, payload = {}) {
   return parsed;
 }
 
+
+// ── Auth renewal ────────────────────────────────────────────────────────────────
+const DCD_HOST  = 'sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com';
+const DCD_ENTRY = 'https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html';
+
+export async function renewAuth() {
+  // Ensure both providers are registered before forcing renewal.
+  // createAuthClient is idempotent — safe to call even if already registered.
+  createAuthClient({ domain: DCD_HOST, method: 'sap-sso', entryUrl: DCD_ENTRY });
+
+  const auth = AuthManager.getInstance();
+  const results = {};
+
+  try { await auth.forceReauth(BUDGIE_HOST); results.harmony = 'ok'; }
+  catch (e) { results.harmony = `error: ${e.message}`; }
+
+  try { await auth.forceReauth(DCD_HOST); results.dcd = 'ok'; }
+  catch (e) { results.dcd = `error: ${e.message}`; }
+
+  const ok = results.harmony === 'ok' && results.dcd === 'ok';
+  return {
+    ok,
+    harmony: results.harmony,
+    dcd: results.dcd,
+    message: ok
+      ? 'SAP cookies renovados. Harmony + DCD prontos.'
+      : 'Renovacao parcial — ver detalhes.',
+  };
+}

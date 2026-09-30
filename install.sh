@@ -99,6 +99,8 @@ EOF
 chmod +x "$START_SCRIPT"
 
 # ── Criar launcher clicável na área de trabalho ───────────────────────────────
+# Detect real node executable path (works for Homebrew Intel, Homebrew Apple Silicon, nvm, direct install)
+NODE_EXEC=$(node -e "process.stdout.write(process.execPath)")
 DESKTOP_LAUNCHER="$HOME/Desktop/SAP Scrubbing MCP.command"
 cat > "$DESKTOP_LAUNCHER" << EOF
 #!/usr/bin/env bash
@@ -112,7 +114,7 @@ echo "  URL: http://localhost:$PORT/mcp"
 echo "  Pressione Ctrl+C para encerrar."
 echo ""
 
-node packages/servers/scrubbing-mcp/src/mcp-server-http.mjs
+"$NODE_EXEC" packages/servers/scrubbing-mcp/src/mcp-server-http.mjs
 EOF
 chmod +x "$DESKTOP_LAUNCHER"
 
@@ -129,7 +131,7 @@ cat > "$PLIST_PATH" << EOF
     <string>com.sap.scrubbing</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/node</string>
+        <string>$NODE_EXEC</string>
         <string>$INSTALL_DIR/packages/servers/scrubbing-mcp/src/mcp-server-http.mjs</string>
     </array>
     <key>WorkingDirectory</key>

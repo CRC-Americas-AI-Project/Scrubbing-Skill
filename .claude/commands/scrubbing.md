@@ -4,28 +4,33 @@ description: >
   Scrubbing de oportunidades SAP no Harmony — processo oficial baseado no How to Guide 2026
   e Naming Convention SAP. Cobre Harmony Quote Opportunities via DCD, multi-contrato,
   calcula IPCA por contrato, atualiza Renewal Execution. Naming convention global oficial SAP.
-  100% headless via MCP. Use quando a oportunidade requer o processo oficial SAP CRC.
+  100% headless via MCP Scrubbing unificado (Harmony + DCD em um único servidor).
+  Use quando a oportunidade requer o processo oficial SAP CRC.
+  v3.0 — MCP unificado + regra de uplift 3.30% + IPCA somente na nota ZRE6.
 argument-hint: "[OPP_ID]"
 arguments:
   - name: opp_id
     description: "ID da oportunidade no Harmony (ex: 306358820)"
     required: true
 allowed-tools:
-  - mcp__sap-harmony__harmony_opp_read
-  - mcp__sap-harmony__harmony_opp_list_quotes
-  - mcp__sap-harmony__harmony_messages_set
-  - mcp__sap-harmony__harmony_read_renewal_execution
-  - mcp__sap-harmony__harmony_set_opp_description
-  - mcp__sap-harmony__harmony_set_close_date
-  - mcp__sap-harmony__harmony_set_renewal_execution
-  - mcp__sap-harmony__harmony_set_renewal_execution_notes
-  - mcp__sap-harmony__harmony_set_renewal_risk
-  - mcp__sap-harmony__harmony_deals_list
-  - mcp__sap-harmony__harmony_odata_function
-  - mcp__sap-dcd__dcd_search
-  - mcp__sap-dcd__dcd_customer_contracts
-  - mcp__sap-dcd__dcd_contract_documents
-  - mcp__sap-dcd__dcd_download_contract
+  - mcp__scrubbing__renew_auth
+  - mcp__scrubbing__harmony_whoami
+  - mcp__scrubbing__dcd_whoami
+  - mcp__scrubbing__harmony_opp_read
+  - mcp__scrubbing__harmony_opp_list_quotes
+  - mcp__scrubbing__harmony_messages_set
+  - mcp__scrubbing__harmony_read_renewal_execution
+  - mcp__scrubbing__harmony_set_opp_description
+  - mcp__scrubbing__harmony_set_close_date
+  - mcp__scrubbing__harmony_set_renewal_execution
+  - mcp__scrubbing__harmony_set_renewal_execution_notes
+  - mcp__scrubbing__harmony_set_renewal_risk
+  - mcp__scrubbing__harmony_deals_list
+  - mcp__scrubbing__harmony_odata_function
+  - mcp__scrubbing__dcd_search
+  - mcp__scrubbing__dcd_customer_contracts
+  - mcp__scrubbing__dcd_contract_documents
+  - mcp__scrubbing__dcd_download_contract
   - Bash
   - Read
   - WebFetch
@@ -57,7 +62,12 @@ Se invocado sem argumento, perguntar: "Qual é o OPP_ID?"
 
 ## Pré-requisito: verificar auth
 
-Testar com `harmony_opp_read(opp_id)`. Se retornar erro de auth: informar que os cookies SAP expiraram e executar o procedimento de renovação de auth (`node ~/.sap-mcp/auto-renew-auth.mjs` ou procedimento manual).
+Testar com `mcp__scrubbing__harmony_whoami()` e `mcp__scrubbing__dcd_whoami()` em paralelo.
+
+Se qualquer um retornar erro de autenticação (401/403/SAML/fetch failed):
+1. Chamar `mcp__scrubbing__renew_auth()` — sap-auth abre Edge com SSO corporativo automaticamente. Aguardar até ~60s.
+2. Se `ok: true` → repetir whoami e prosseguir.
+3. Se `ok: false` com erro técnico (sem browser, timeout) → pedir ao usuário para abrir o Edge, acessar Harmony e DCD, fazer login SSO, e avisar quando terminar.
 
 ---
 
@@ -293,23 +303,27 @@ Extrair por contrato:
 
 **Identificar o país da conta no Harmony** (campo `ACCNT_PE_PLN_GROUP` ou `COUNTRY` das PartiesInvolved) antes de decidir a metodologia.
 
+> **Regra universal:** o campo `contrUpliftPc` (% de uplift no Harmony) é **sempre preenchido com 3.30%**, independentemente de Brasil ou LATAM. A sugestão real de IPCA vai **somente na nota ZRE6**.
+
 **Brasil:**
 - Procurar cláusula §5.4 (ou §6.4, §3.2): define aniversário, indexador e forma de cálculo
 - IPCA/CPI mencionado → `contrUpliftType = "7"` (CPI Per Annum)
 - Sem cláusula de reajuste → `contrUpliftType = "1"` (No Increase), Uplift % = 0
 - OBV = BRL 0,00 (entitlement): CPI Per Annum, Uplift % = 0
-- Calcular via API BCB série 433 (metodologia cumulativa)
+- Calcular via API BCB série 433 (metodologia cumulativa) — resultado vai para ZRE6, não para o campo
+- O 3.30% no campo é simbólico/padrão; o IPCA real calculado fica registrado na nota ZRE6
 
 **América Latina (não-Brasil), Europa e outros mercados:**
-- Taxa fixa contratual de 3,3% — **NÃO** calcular via API BCB
-- Verificar no contrato: taxa flat/fixa mencionada → `contrUpliftType = "6"` (Flat Per Annum, key 6)
-- Índice de preços local mencionado → `contrUpliftType = "7"` (CPI Per Annum, key 7)
-- Sem cláusula de reajuste → `contrUpliftType = "1"` (No Increase)
+- Taxa fixa contratual de 3.30% — **NÃO** calcular via API BCB
+- `contrUpliftType = "6"` (Flat Per Annum, key 6) se taxa flat/fixa mencionada no contrato
+- `contrUpliftType = "7"` (CPI Per Annum, key 7) se índice de preços local mencionado
+- `contrUpliftType = "1"` (No Increase) se sem cláusula de reajuste
+- O 3.30% no campo é a taxa real aplicável — registrar também em ZRE6
 
 **Tabela de keys de Uplift Type:**
 | Key | Tipo | Uso |
 |---|---|---|
-| `"6"` | Flat Per Annum | LATAM/outros — taxa fixa (padrão 3,3%) |
+| `"6"` | Flat Per Annum | LATAM/outros — taxa fixa (3.30%) |
 | `"7"` | CPI Per Annum | Brasil — indexado IPCA |
 | `"1"` | No increase language | Sem cláusula de reajuste |
 
@@ -364,17 +378,27 @@ Para todos os demais: usar datas do contrato DCD mapeado na Fase 2 (ou `PREV_CON
 
 ### 6.3 Cálculo via API BCB (série 433)
 
+> **REGRA ABSOLUTA:** NUNCA usar WebFetch, WebSearch ou qualquer site externo para obter dados de IPCA. SEMPRE e exclusivamente Bash + Node.js abaixo. Uma única chamada por predecessor, cobrindo o período completo — NUNCA fazer chamadas individuais por mês ou por ano.
+
 ```
 Janela = (Start Date − 6 meses) → (End Date − 6 meses)
 ```
 
 ```bash
-curl "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY"
+node -e "
+fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY')
+  .then(r=>r.json()).then(d=>{
+    const acc = d.reduce((p,c)=>p*(1+parseFloat(c.valor)/100),1)-1;
+    console.log('IPCA:', (acc*100).toFixed(4)+'%', '| meses:', d.length);
+  });
+"
 ```
 
 Calcular produto cumulativo: `((1+m1) × (1+m2) × ... × (1+mN)) − 1`
 
 Meses não publicados pelo IBGE → sinalizar como "pending IBGE publication" e usar valor parcial.
+
+**Se a API BCB falhar** (timeout, sem conectividade) → registrar flag "IPCA pendente — BCB indisponível" no relatório e continuar. Não tentar alternativas via web.
 
 ### 6.4 OBV Alvo por contrato
 
@@ -449,7 +473,7 @@ harmony_set_opp_description(opp_id, text: "<título corrigido>")
    ```
    - **Nunca pular esta chamada** — `CLOSE_DATE_EDITABLE: false` é apenas estado da UI; o MCP bypassa e grava mesmo assim
    - `ok: true` (mesmo com `wasEditable: false`) → atualizado com sucesso
-   - `ok: false` → flag: "Close Date bloqueado — revisão manual necessária"
+   - `ok: false` → flag: "Close Date bloqueado — revisão manual necessária: [errorMessage]"
 
 ### 7.2 Risk Retention Lever
 
@@ -465,7 +489,7 @@ harmony_set_renewal_execution(opp_id,
   gtcDate:           "YYYY-MM-DD",    # do rodapé ptBR.v.X-YYYY; omitir se SAP Store
   contrUpliftType:   "7",             # Brasil IPCA: "7" CPI Per Annum | LATAM/outros: "6" Flat Per Annum | sem reajuste: "1" No Increase
   negUpliftLang:     "Y",             # Y se IPCA/tributos mencionados no contrato
-  contrUpliftPc:     "X.XX",         # IPCA a sugerir (parcial se meses pendentes IBGE)
+  contrUpliftPc:     "3.30",          # SEMPRE 3.30% — independente de Brasil ou LATAM
   gtcDeviationsFlag: "Y" ou "N"
 )
 ```
@@ -511,15 +535,16 @@ harmony_set_renewal_execution_notes(opp_id,
 [Scrubbot, DD/MM/YYYY]
 ```
 
-**Uplift % Remarks (ZRE6) — contrato único:**
+**Uplift % Remarks (ZRE6) — Brasil, contrato único:**
 ```
 - Cumulative IPCA available: X.XX% ([N]/12 months published)
 - Already applied: X.XX%
 - Suggested: X.XX% [partial — pending IBGE: Mmm/YYYY–Mmm/YYYY — update once published]
+- Note: 3.30% entered in Harmony uplift field is the standard placeholder; real suggested rate above
 [Scrubbot, DD/MM/YYYY]
 ```
 
-**Uplift % Remarks (ZRE6) — multi-contrato:**
+**Uplift % Remarks (ZRE6) — Brasil, multi-contrato:**
 ```
 Contrato Inicial:
 - Cumulative IPCA available: X.XX% ([N]/12 months published)
@@ -529,6 +554,13 @@ Contrato Inicial:
 Aditivo 1:
 - Total cumulative IPCA: X.XX%
 - Suggested: X.XX%
+- Note: 3.30% entered in Harmony uplift field is the standard placeholder; real suggested rates above
+[Scrubbot, DD/MM/YYYY]
+```
+
+**Uplift % Remarks (ZRE6) — LATAM/outros:**
+```
+- Contractual flat rate: 3.30% per annum (fixed rate per contract terms — no BCB calculation)
 [Scrubbot, DD/MM/YYYY]
 ```
 
@@ -556,7 +588,7 @@ Aditivo 1:
 
 ### 7.7 Ações manuais (não automatizáveis via MCP — registrar no relatório)
 
-- **Renewal Type:** não editável via MCP — alterar manualmente na UI Harmony
+- **Renewal Type:** registrar como ação manual **somente** quando o PDF indicar **Active Renewal**. Se PDF = Auto Renewal (padrão), **não gerar esta flag**.
 - **Incremental Increase Block por item:** definir `Increase Type` e `Increase %` para cada linha na UI Harmony
 
 ---
@@ -598,11 +630,12 @@ CAMPOS PREENCHIDOS NO HARMONY
 • GTC Deviations: [resumo ou —]
 • Uplift Type: [CPI Per Annum / No Increase]
 • GTC Date: [DD/MM/YYYY ou N/A — SAP Store]
-• Uplift %: [valor] [parcial — pending IBGE: meses se aplicável]
+• Uplift %: 3.30% (campo padrão) | IPCA sugerido real: [ver ZRE6]
 • Per Annum Language: [Y / N]
 
 AÇÕES MANUAIS PENDENTES
-• Renewal Type: alterar para [Auto/Active Renewal] na UI Harmony
+• Renewal Type: definir como Active Renewal na UI Harmony  ← incluir SOMENTE se PDF = Active Renewal
+• Close Date: definir como [data] na UI Harmony — SAP backend rejeitou: [errorMessage]  ← incluir SOMENTE se ok: false
 • Incremental Increase Block: definir Increase Type = CPI Per Annum / Increase % = X.XX% por linha
 
 FLAGS
@@ -696,8 +729,8 @@ Aditivo 1 ([Start]–[End]):
 - IPCA: usar datas do item, não do contrato pai
 
 **Q: IPCA parcial — o que preencher?**
-- `contrUpliftPc`: valor parcial disponível
-- ZRE6: documentar meses disponíveis + `"— field should be updated once IBGE publishes [Mmm/YYYY–Mmm/YYYY]"`
+- `contrUpliftPc`: sempre 3.30% (padrão fixo no campo)
+- ZRE6: documentar meses disponíveis, valor parcial + `"— field should be updated once IBGE publishes [Mmm/YYYY–Mmm/YYYY]"`
 
 **Q: Co-Termed vs Non-Co-Termed?**
 - **Co-Termed**: todos os itens com mesma data de vencimento
