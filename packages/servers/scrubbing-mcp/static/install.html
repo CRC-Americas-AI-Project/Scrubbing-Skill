@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAP Scrubbing MCP — Guia de Instalação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=72:wght@400;600;700&family=72+Mono&display=swap" rel="stylesheet">
+<style>
+  /* ── Variables ── */
+  :root {
+    --blue:        #0070F2;
+    --blue-dark:   #0040B0;
+    --gold:        #F0AB00;
+    --bg:          #1C2025;
+    --surface:     #232B33;
+    --surface2:    #1A2230;
+    --border:      #2E3840;
+    --text:        #E0E6ED;
+    --muted:       #8A9BB0;
+    --green:       #30914C;
+    --green-light: #A8E6B8;
+    --header-bg:   #0D1117;
+  }
+
+  /* ── Reset / Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: '72', 'Segoe UI', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 15px;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1, h2, h3 { color: var(--text); font-weight: 700; }
+  h1 { font-size: 2rem; border-bottom: 2px solid var(--blue); padding-bottom: 0.4rem; margin-bottom: 1rem; }
+  h2 { font-size: 1.35rem; margin: 2rem 0 0.8rem; }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; }
+  p  { margin-bottom: 0.8rem; }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.8rem; }
+  li { margin-bottom: 0.3rem; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  strong { color: var(--text); }
+  kbd {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1rem 0.45rem;
+    font-family: '72 Mono', monospace;
+    font-size: 0.85em;
+  }
+
+  /* ── Layout ── */
+  .page-wrap { display: flex; min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--header-bg);
+    border-bottom: 2px solid var(--blue);
+    height: 56px;
+    display: flex; align-items: center; padding: 0 1.5rem; gap: 1rem;
+  }
+  header .logo-wrap { display: flex; align-items: center; gap: 0.75rem; }
+  header .logo-wrap svg { height: 28px; width: auto; }
+  header .logo-divider { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+  header .logo-text {
+    font-weight: 600; font-size: 1rem; letter-spacing: 0.01em;
+    color: #fff; white-space: nowrap;
+  }
+  header .logo-text span { color: var(--gold); }
+  header .badge {
+    margin-left: auto;
+    background: rgba(0,112,242,0.15);
+    border: 1px solid rgba(0,112,242,0.35);
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 0.78rem;
+    color: var(--blue);
+    white-space: nowrap;
+  }
+
+  /* ── Sidebar ── */
+  nav.sidebar {
+    position: fixed; top: 56px; left: 0; bottom: 0;
+    width: 260px; overflow-y: auto;
+    background: #141A21;
+    border-right: 1px solid var(--border);
+    padding: 1.2rem 0;
+  }
+  nav.sidebar .nav-section {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--muted);
+    padding: 0.8rem 1.1rem 0.3rem;
+  }
+  nav.sidebar a {
+    display: block; padding: 0.42rem 1.1rem;
+    color: var(--muted); font-size: 0.88rem;
+    border-radius: 4px; margin: 0 0.4rem;
+    transition: background 0.15s, color 0.15s;
+  }
+  nav.sidebar a:hover { color: var(--blue); text-decoration: none; background: rgba(0,112,242,0.07); }
+  nav.sidebar a.active { background: var(--blue); color: #fff !important; font-weight: 600; }
+
+  /* ── Main ── */
+  main {
+    margin-left: 260px;
+    margin-top: 56px;
+    padding: 2.5rem 3rem 4rem;
+    max-width: 860px;
+    width: 100%;
+  }
+
+  /* ── Pages ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, #0D1A2E 0%, #1A2B45 100%);
+    border: 1px solid var(--blue);
+    border-radius: 10px;
+    padding: 2.5rem 2rem;
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+  .hero h1 { border: none; font-size: 1.9rem; color: #fff; margin-bottom: 0.5rem; }
+  .hero p  { color: var(--muted); font-size: 1rem; margin-bottom: 1.5rem; }
+  .hero-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+  /* ── Flow steps (Home) ── */
+  .flow-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .flow-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.3rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+    position: relative;
+  }
+  .flow-card:hover { border-color: var(--blue); transform: translateY(-2px); }
+  .flow-card .flow-num {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--blue); color: #fff;
+    font-weight: 700; font-size: 0.9rem;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 0.7rem;
+  }
+  .flow-card .flow-icon { font-size: 1.8rem; margin-bottom: 0.5rem; }
+  .flow-card .flow-title { font-weight: 700; font-size: 0.95rem; color: var(--text); margin-bottom: 0.3rem; }
+  .flow-card .flow-sub { font-size: 0.8rem; color: var(--muted); }
+  .flow-arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 1.4rem; padding-top: 1rem;
+  }
+  @media (max-width: 600px) { .flow-grid { grid-template-columns: 1fr; } }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.55rem;
+    background: var(--blue); color: #fff !important;
+    font-family: '72', 'Segoe UI', Arial, sans-serif;
+    font-size: 1rem; font-weight: 600;
+    padding: 0.8rem 1.8rem; border-radius: 6px;
+    text-decoration: none !important;
+    transition: background 0.2s, transform 0.1s;
+    border: none; cursor: pointer;
+  }
+  .btn:hover { background: var(--blue-dark) !important; transform: translateY(-1px); text-decoration: none !important; }
+  .btn svg { width: 18px; height: 18px; fill: #fff; flex-shrink: 0; }
+  .btn-outline {
+    background: transparent;
+    border: 2px solid var(--blue);
+    color: var(--blue) !important;
+  }
+  .btn-outline svg { fill: var(--blue); }
+  .btn-outline:hover { background: rgba(0,112,242,0.1) !important; transform: translateY(-1px); }
+  .btn-gold {
+    background: transparent;
+    border: 2px solid var(--gold);
+    color: var(--gold) !important;
+  }
+  .btn-gold svg { fill: var(--gold); }
+  .btn-gold:hover { background: rgba(240,171,0,0.1) !important; transform: translateY(-1px); }
+  .btn-sm { font-size: 0.88rem; padding: 0.55rem 1.2rem; }
+
+  /* ── Alert cards ── */
+  .card {
+    border-radius: 8px; padding: 1rem 1.3rem;
+    margin: 1.2rem 0; display: flex; gap: 1rem; align-items: flex-start;
+  }
+  .card-warning { background: #2A1F00; border-left: 4px solid var(--gold); }
+  .card-info    { background: #0D2340; border-left: 4px solid #1473E6; }
+  .card-success { background: #0D2318; border-left: 4px solid var(--green); }
+  .card-icon    { font-size: 1.3rem; flex-shrink: 0; margin-top: 0.05rem; }
+  .card-body strong { display: block; font-size: 0.97rem; margin-bottom: 0.3rem; }
+  .card-body p, .card-body ul { margin: 0; color: var(--muted); font-size: 0.88rem; }
+  .card-body ul { padding-left: 1.1rem; margin-top: 0.3rem; }
+  .card-body a { color: var(--gold); }
+
+  /* ── Step circles ── */
+  .step { display: flex; align-items: flex-start; gap: 1rem; margin: 1.8rem 0 0.8rem; }
+  .step-num {
+    background: var(--blue); color: #fff; font-weight: 700;
+    font-size: 0.95rem; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .step-num.done { background: var(--green); }
+  .step-title { font-size: 1.05rem; font-weight: 700; color: var(--text); padding-top: 0.35rem; }
+  .step-sub   { font-size: 0.88rem; color: var(--muted); margin-top: 0.2rem; font-weight: 400; }
+
+  /* ── Code blocks ── */
+  pre, code {
+    font-family: '72 Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.87rem;
+  }
+  code {
+    background: var(--surface2); color: #7DD3FC;
+    border-radius: 3px; padding: 0.1rem 0.4rem;
+  }
+  .cmd-wrap { position: relative; margin: 0.8rem 0; }
+  pre {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1rem 1.2rem;
+    overflow-x: auto; white-space: pre; margin: 0;
+  }
+  pre code { background: none; color: #E0E6ED; padding: 0; border-radius: 0; }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--muted); border-radius: 5px;
+    padding: 3px 10px; font-size: 0.75rem; cursor: pointer;
+    transition: all 0.2s; font-family: '72', sans-serif;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+  .copy-btn.copied { background: #0D2318; border-color: var(--green); color: var(--green-light); }
+
+  /* ── Config table ── */
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+  th { background: var(--blue); color: #fff; padding: 0.65rem 1rem; text-align: left; font-weight: 600; }
+  td { padding: 0.55rem 1rem; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:nth-child(even) td { background: var(--surface); }
+  td code { background: rgba(0,112,242,0.15); color: #7DD3FC; }
+
+  /* ── Success banner ── */
+  .success-banner {
+    background: linear-gradient(135deg, #0D2318 0%, #122B1C 100%);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    padding: 2rem;
+    margin-top: 2rem;
+    text-align: center;
+  }
+  .success-banner h3 { font-size: 1.4rem; color: var(--green-light); margin-bottom: 0.5rem; }
+  .success-banner p { color: var(--muted); font-size: 0.95rem; }
+
+  /* ── Screenshot placeholder ── */
+  .screen-hint {
+    background: var(--surface2);
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.88rem;
+    margin: 1rem 0;
+  }
+
+  /* ── FAQ ── */
+  .faq-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.3rem;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .faq-item:hover { border-color: var(--blue); }
+  .faq-item.open  { border-color: var(--blue); }
+  .faq-question {
+    font-weight: 600; font-size: 0.95rem;
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--text);
+  }
+  .faq-chevron { color: var(--blue); transition: transform 0.2s; font-size: 0.8rem; }
+  .faq-item.open .faq-chevron { transform: rotate(180deg); }
+  .faq-answer {
+    margin-top: 10px; color: var(--muted);
+    font-size: 0.9rem; display: none; line-height: 1.7;
+  }
+  .faq-item.open .faq-answer { display: block; }
+  .faq-answer code { font-size: 0.82rem; }
+
+  /* ── Indent helper ── */
+  .indent { margin-left: 50px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 760px) {
+    nav.sidebar { display: none; }
+    main { margin-left: 0; padding: 1.5rem 1.2rem 3rem; }
+    footer { margin-left: 0; }
+    .mobile-nav { display: block; margin-bottom: 1.5rem; }
+    select.mobile-nav-select {
+      width: 100%; padding: 0.7rem; background: var(--surface);
+      color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+      font-size: 0.95rem;
+    }
+    header .badge { display: none; }
+    .indent { margin-left: 0; }
+  }
+  @media (min-width: 761px) { .mobile-nav { display: none; } }
+
+  /* ── Footer ── */
+  footer {
+    margin-left: 260px;
+    background: var(--header-bg); border-top: 1px solid var(--border);
+    padding: 1.2rem 3rem; font-size: 0.82rem; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo-wrap">
+    <svg viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg" aria-label="SAP">
+      <rect width="60" height="30" rx="3" fill="#1872C7"/>
+      <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle"
+            font-family="Arial,sans-serif" font-weight="bold" font-size="16" fill="white">SAP</text>
+    </svg>
+    <div class="logo-divider"></div>
+    <div class="logo-text">Scrub<span>bot</span></div>
+  </div>
+  <div class="badge">⏱ Instalação em ~10 min</div>
+</header>
+
+<!-- ── Layout ── -->
+<div class="page-wrap">
+
+  <!-- ── Sidebar ── -->
+  <nav class="sidebar" id="sidebar">
+    <div class="nav-section">Visão Geral</div>
+    <a href="#" onclick="show('home')" id="nav-home" class="active">🏠 Home</a>
+
+    <div class="nav-section">1 · Instalar o Servidor</div>
+    <a href="#" onclick="show('mac')" id="nav-mac">🍎 Mac</a>
+    <a href="#" onclick="show('windows')" id="nav-windows">🪟 Windows</a>
+
+    <div class="nav-section">2 · Adicionar o Conector</div>
+    <a href="#" onclick="show('joule')" id="nav-joule">🤖 Joule Desktop</a>
+
+    <div class="nav-section">3 · Instalar a Skill</div>
+    <a href="#" onclick="show('skill')" id="nav-skill">🧠 Scrubbing Skill</a>
+
+    <div class="nav-section">Suporte</div>
+    <a href="#" onclick="show('faq')" id="nav-faq">❓ Perguntas Frequentes</a>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main>
+
+    <!-- Mobile nav -->
+    <div class="mobile-nav">
+      <select class="mobile-nav-select" onchange="show(this.value)">
+        <option value="home">🏠 Home</option>
+        <option value="mac">🍎 Mac — Instalar Servidor</option>
+        <option value="windows">🪟 Windows — Instalar Servidor</option>
+        <option value="joule">🤖 Adicionar Conector no Joule</option>
+        <option value="skill">🧠 Instalar a Scrubbing Skill</option>
+        <option value="faq">❓ Perguntas Frequentes</option>
+      </select>
+    </div>
+
+    <!-- ══════════════════════════════════════════ HOME ══ -->
+    <section class="page active" id="page-home">
+      <div class="hero">
+        <h1>🔧 SAP Scrubbot</h1>
+        <p>Guia de instalação completo para o Joule Desktop</p>
+        <div class="hero-buttons">
+          <a class="btn" href="#" onclick="show('mac'); return false;">
+            <svg viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+            Instalar no Mac
+          </a>
+          <a class="btn btn-outline" href="#" onclick="show('windows'); return false;">
+            <svg viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+            Instalar no Windows
+          </a>
+        </div>
+      </div>
+
+      <div class="card card-success">
+        <div class="card-icon">🤖</div>
+        <div class="card-body">
+          <strong>Instalação totalmente automatizada</strong>
+          <p>Os scripts verificam e instalam todos os pré-requisitos automaticamente (Node.js, Git, Homebrew no Mac). Você não precisa instalar nada manualmente.</p>
+        </div>
+      </div>
+
+      <h2>Visão geral — 3 etapas</h2>
+      <p style="color:var(--muted); margin-bottom:1.2rem;">Siga as etapas na ordem. Cada uma leva cerca de 2 a 3 minutos.</p>
+
+      <div class="flow-grid">
+        <div class="flow-card" onclick="show('mac')">
+          <div class="flow-num">1</div>
+          <div class="flow-icon">⚙️</div>
+          <div class="flow-title">Instalar o Servidor MCP</div>
+          <div class="flow-sub">Roda localmente na sua máquina e conecta ao Harmony SAP</div>
+        </div>
+        <div class="flow-card" onclick="show('joule')">
+          <div class="flow-num">2</div>
+          <div class="flow-icon">🤖</div>
+          <div class="flow-title">Adicionar o Conector</div>
+          <div class="flow-sub">Liga o Joule Desktop ao servidor MCP instalado</div>
+        </div>
+        <div class="flow-card" onclick="show('skill')">
+          <div class="flow-num">3</div>
+          <div class="flow-icon">🧠</div>
+          <div class="flow-title">Instalar a Skill</div>
+          <div class="flow-sub">Ensina o Joule a executar o processo oficial de scrubbing</div>
+        </div>
+      </div>
+
+      <h2>O que cada componente faz</h2>
+      <table>
+        <tr><th>Componente</th><th>O que é</th><th>Para que serve</th></tr>
+        <tr>
+          <td><strong>Servidor MCP</strong></td>
+          <td>Processo Node.js rodando localmente</td>
+          <td>Comunica com o Harmony SAP — lê e atualiza oportunidades, quotes e renewal execution</td>
+        </tr>
+        <tr>
+          <td><strong>Scrubbing Skill</strong></td>
+          <td>Conjunto de instruções instalado no Joule</td>
+          <td>Define o fluxo oficial de scrubbing: naming convention, IPCA, DCD, renewal execution</td>
+        </tr>
+        <tr>
+          <td><strong>Conector MCP</strong></td>
+          <td>Configuração no Joule Desktop</td>
+          <td>Registra a URL do servidor local para que o Joule consiga chamá-lo</td>
+        </tr>
+      </table>
+    </section>
+
+    <!-- ══════════════════════════════════════════ MAC ══ -->
+    <section class="page" id="page-mac">
+      <h1>Etapa 1 — Instalar o Servidor (Mac)</h1>
+      <p>O script configura tudo automaticamente: Homebrew, Node.js, Git e o servidor MCP.</p>
+
+      <div class="card card-success">
+        <div class="card-icon">✅</div>
+        <div class="card-body">
+          <strong>Pré-requisitos instalados automaticamente</strong>
+          <ul>
+            <li><strong>Homebrew</strong> — gerenciador de pacotes do Mac (instalado se ausente)</li>
+            <li><strong>Node.js 20+</strong> — instalado via Homebrew se ausente</li>
+            <li><strong>Git</strong> — instalado via Xcode Tools se ausente</li>
+          </ul>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Abra o Terminal</div>
+          <div class="step-sub">Pressione <kbd>⌘ Command</kbd> + <kbd>Espaço</kbd>, digite <strong>Terminal</strong> e pressione Enter</div>
+        </div>
+      </div>
+
+      <div class="card card-warning indent">
+        <div class="card-icon">💡</div>
+        <div class="card-body">
+          <strong>Primeira vez usando o Terminal?</strong>
+          <p>Pressione <kbd>⌘ Command</kbd> + <kbd>Espaço</kbd> ao mesmo tempo, escreva <strong>Terminal</strong> e pressione Enter. Uma janela de texto vai abrir — é aí que você vai colar o comando abaixo.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Cole o comando de instalação</div>
+          <div class="step-sub">Copie e cole no Terminal com <kbd>⌘V</kbd>, depois pressione Enter</div>
+        </div>
+      </div>
+
+      <div class="cmd-wrap indent">
+        <pre><code id="cmd-mac">curl -fsSL https://raw.githubusercontent.com/CRC-Americas-AI-Project/Scrubbing-Skill/main/install.sh | bash</code></pre>
+        <button class="copy-btn" onclick="copyCmd('cmd-mac', this)">Copiar</button>
+      </div>
+
+      <div class="card card-warning indent">
+        <div class="card-icon">⏳</div>
+        <div class="card-body">
+          <strong>Aguarde 2 a 3 minutos</strong>
+          <p>Não feche o Terminal enquanto o processo estiver rodando.</p>
+        </div>
+      </div>
+      <div class="card card-success indent">
+        <div class="card-icon">✅</div>
+        <div class="card-body">
+          <strong>Quando aparecer "Instalação concluída!" — está pronto</strong>
+          <p>Você pode fechar o Terminal após essa mensagem.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Inicie o servidor pela primeira vez</div>
+          <div class="step-sub">Clique duas vezes no arquivo <strong>"SAP Scrubbing MCP.command"</strong> na sua Área de Trabalho</div>
+        </div>
+      </div>
+
+      <div class="card card-info indent">
+        <div class="card-icon">▶️</div>
+        <div class="card-body">
+          <strong>Execute o atalho na Área de Trabalho</strong>
+          <p>Localize o arquivo <strong>"SAP Scrubbing MCP.command"</strong> na sua Área de Trabalho e clique duas vezes para iniciar o servidor. Uma janela do terminal vai abrir — aguarde até aparecer a mensagem confirmando que o servidor está rodando.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num done">✓</div>
+        <div>
+          <div class="step-title">Servidor instalado</div>
+          <div class="step-sub">O servidor inicia automaticamente no próximo login do Mac</div>
+        </div>
+      </div>
+
+      <p class="indent" style="margin-bottom:1rem;">Um arquivo <strong>"SAP Scrubbing MCP.command"</strong> foi criado na sua Área de Trabalho para iniciar o servidor manualmente quando necessário.</p>
+
+      <div class="card card-info indent">
+        <div class="card-icon">🔄</div>
+        <div class="card-body">
+          <strong>Início automático ativo</strong>
+          <p>Nas próximas sessões do Mac, o servidor já inicia automaticamente — sem nenhuma ação sua.</p>
+        </div>
+      </div>
+
+      <p style="margin-top:2rem;">
+        <a class="btn btn-sm" href="#" onclick="show('joule'); return false;">Próximo: Adicionar o Conector →</a>
+      </p>
+    </section>
+
+    <!-- ══════════════════════════════════════════ WINDOWS ══ -->
+    <section class="page" id="page-windows">
+      <h1>Etapa 1 — Instalar o Servidor (Windows)</h1>
+      <p>O script configura tudo automaticamente: Node.js, Git e o servidor MCP.</p>
+
+      <div class="card card-success">
+        <div class="card-icon">✅</div>
+        <div class="card-body">
+          <strong>Pré-requisitos instalados automaticamente</strong>
+          <ul>
+            <li><strong>Node.js 20+</strong> — instalado via winget se ausente</li>
+            <li><strong>Git</strong> — instalado via winget se ausente</li>
+          </ul>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Abra o PowerShell</div>
+          <div class="step-sub">Pressione <kbd>⊞ Win</kbd> + <kbd>X</kbd> e selecione "Terminal" ou "Windows PowerShell"</div>
+        </div>
+      </div>
+
+      <div class="card card-warning indent">
+        <div class="card-icon">💡</div>
+        <div class="card-body">
+          <strong>Primeira vez usando o PowerShell?</strong>
+          <p>Pressione <kbd>⊞ Windows</kbd> + <kbd>X</kbd> ao mesmo tempo e clique em <strong>"Terminal"</strong> ou <strong>"Windows PowerShell"</strong> no menu que aparecer.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Cole o comando de instalação</div>
+          <div class="step-sub">Copie e cole no PowerShell com <kbd>Ctrl+V</kbd>, depois pressione Enter</div>
+        </div>
+      </div>
+
+      <div class="cmd-wrap indent">
+        <pre><code id="cmd-win">Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; iwr https://raw.githubusercontent.com/CRC-Americas-AI-Project/Scrubbing-Skill/main/install.ps1 -OutFile "$env:TEMP\install.ps1"; & "$env:TEMP\install.ps1"</code></pre>
+        <button class="copy-btn" onclick="copyCmd('cmd-win', this)">Copiar</button>
+      </div>
+
+      <div class="card card-warning indent">
+        <div class="card-icon">⏳</div>
+        <div class="card-body">
+          <strong>Aguarde 2 a 3 minutos</strong>
+          <p>Não feche o PowerShell enquanto o processo estiver rodando.</p>
+        </div>
+      </div>
+      <div class="card card-warning indent">
+        <div class="card-icon">🛡️</div>
+        <div class="card-body">
+          <strong>Aviso de segurança do Windows?</strong>
+          <p>Se aparecer "O Windows protegeu seu computador", clique em <strong>"Mais informações"</strong> e depois em <strong>"Executar assim mesmo"</strong>. Isso é normal para scripts PowerShell.</p>
+        </div>
+      </div>
+      <div class="card card-success indent">
+        <div class="card-icon">✅</div>
+        <div class="card-body">
+          <strong>Quando aparecer "Instalação concluída!" — está pronto</strong>
+          <p>Você pode fechar o PowerShell após essa mensagem.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Inicie o servidor pela primeira vez</div>
+          <div class="step-sub">Clique duas vezes no arquivo <strong>"SAP Scrubbing MCP.bat"</strong> na sua Área de Trabalho</div>
+        </div>
+      </div>
+
+      <div class="card card-info indent">
+        <div class="card-icon">▶️</div>
+        <div class="card-body">
+          <strong>Execute o atalho na Área de Trabalho</strong>
+          <p>Localize o arquivo <strong>"SAP Scrubbing MCP.bat"</strong> na sua Área de Trabalho e clique duas vezes para iniciar o servidor. Uma janela do terminal vai abrir — aguarde até aparecer a mensagem confirmando que o servidor está rodando.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num done">✓</div>
+        <div>
+          <div class="step-title">Servidor instalado</div>
+          <div class="step-sub">Atalho "SAP Scrubbing MCP.bat" criado na Área de Trabalho</div>
+        </div>
+      </div>
+
+      <p class="indent" style="margin-bottom:0.5rem;">Prefere baixar o arquivo manualmente? <a href="https://raw.githubusercontent.com/CRC-Americas-AI-Project/Scrubbing-Skill/main/install.ps1" download="install.ps1">Clique aqui para baixar install.ps1</a> e execute com clique direito → "Executar com o PowerShell".</p>
+
+      <div class="card card-info indent" style="margin-top:1rem;">
+        <div class="card-icon">🔄</div>
+        <div class="card-body">
+          <strong>Início automático ativo</strong>
+          <p>Nas próximas sessões do Windows, o servidor já inicia automaticamente — sem nenhuma ação sua.</p>
+        </div>
+      </div>
+
+      <p style="margin-top:2rem;">
+        <a class="btn btn-sm" href="#" onclick="show('joule'); return false;">Próximo: Adicionar o Conector →</a>
+      </p>
+    </section>
+
+    <!-- ══════════════════════════════════════════ SKILL ══ -->
+    <section class="page" id="page-skill">
+      <h1>Etapa 3 — Instalar a Scrubbing Skill</h1>
+      <p>A Skill é um conjunto de instruções que ensina o Joule Desktop a executar o processo oficial de scrubbing SAP — naming convention, cálculo de IPCA, atualização do Renewal Execution e muito mais.</p>
+
+      <div class="card card-info">
+        <div class="card-icon">ℹ️</div>
+        <div class="card-body">
+          <strong>O que a Skill faz</strong>
+          <p>Ela orienta o Joule a seguir o fluxo oficial SAP CRC: leitura do Harmony, consulta ao DCD, análise do PDF do contrato, cálculo de IPCA, atualização do título (naming convention), preenchimento do Renewal Execution e geração de relatório — tudo via MCP, sem abrir o navegador.</p>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Baixe o arquivo da Skill</div>
+          <div class="step-sub">Clique no botão abaixo para baixar o arquivo <strong>skill.md</strong></div>
+        </div>
+      </div>
+
+      <div class="indent" style="margin-bottom:1.5rem;">
+        <button class="btn" onclick="downloadSkill()">
+          <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7 7-7z"/></svg>
+          Baixar skill.md
+        </button>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Abra o painel de Extensions no Joule Desktop</div>
+          <div class="step-sub">Clique no ícone de banco de dados (⊞) na barra lateral esquerda</div>
+        </div>
+      </div>
+
+      <p class="indent">Na barra de navegação lateral do Joule Desktop, clique no ícone de <strong>Extensions</strong> (parece um banco de dados / cilindro). Em seguida, clique na aba <strong>Skills</strong>.</p>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Importe a Skill</div>
+          <div class="step-sub">Extensions → Skills → + New → Import</div>
+        </div>
+      </div>
+
+      <ol class="indent" style="line-height:2.1; color:var(--text);">
+        <li>Clique em <strong>"+ New"</strong> no topo do painel de Extensions</li>
+        <li>Selecione <strong>"Create Skill"</strong></li>
+        <li>Escolha a opção <strong>"Import"</strong></li>
+        <li>Selecione o arquivo <strong>skill.md</strong> que você baixou no Passo 1</li>
+        <li>Confirme a instalação</li>
+      </ol>
+
+      <div class="step">
+        <div class="step-num done">✓</div>
+        <div>
+          <div class="step-title">Skill instalada</div>
+          <div class="step-sub">Ela aparece na lista de Skills com o nome "scrubbing skill"</div>
+        </div>
+      </div>
+
+      <div class="card card-success indent">
+        <div class="card-icon">✅</div>
+        <div class="card-body">
+          <strong>Verificação rápida</strong>
+          <p>Na lista de Skills (Extensions → Skills), você deve ver a skill <strong>"scrubbing skill"</strong> com a descrição: <em>"Scrubbing de oportunidades SAP no Harmony..."</em></p>
+        </div>
+      </div>
+
+      <div class="card card-warning indent">
+        <div class="card-icon">⚠️</div>
+        <div class="card-body">
+          <strong>Mantenha menos de 20 skills instaladas</strong>
+          <p>O Joule Desktop tem melhor desempenho com até 20 skills ativas. Se tiver mais, desative as que não usa.</p>
+        </div>
+      </div>
+
+      <p style="margin-top:2rem;">
+        <a class="btn btn-sm btn-outline" href="#" onclick="show('faq'); return false;">❓ Ver Perguntas Frequentes</a>
+      </p>
+    </section>
+
+    <!-- ══════════════════════════════════════════ JOULE ══ -->
+    <section class="page" id="page-joule">
+      <h1>Etapa 2 — Adicionar o Conector no Joule</h1>
+      <p>Registre o servidor MCP local no Joule Desktop para que ele consiga se comunicar com o Harmony SAP.</p>
+
+      <div class="card card-warning">
+        <div class="card-icon">⚠️</div>
+        <div class="card-body">
+          <strong>Complete a etapa 1 antes de continuar</strong>
+          <p>O servidor MCP precisa estar instalado (<a href="#" onclick="show('mac'); return false;">Mac</a> / <a href="#" onclick="show('windows'); return false;">Windows</a>) antes de adicionar o conector.</p>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Abra o painel de Extensions</div>
+          <div class="step-sub">Clique no ícone de banco de dados na barra lateral esquerda → aba Connectors</div>
+        </div>
+      </div>
+      <p class="indent">Na barra de navegação lateral do Joule Desktop, clique no ícone de <strong>Extensions</strong> e depois na aba <strong>Connectors</strong>.</p>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Adicione um novo conector</div>
+          <div class="step-sub">Extensions → Connectors → + New → Add Connector</div>
+        </div>
+      </div>
+      <p class="indent" style="margin-bottom:1rem;">Clique em <strong>"+ New"</strong> no topo do painel, depois selecione <strong>"Add Connector"</strong>.</p>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Preencha os campos do conector</div>
+          <div class="step-sub">Copie exatamente os valores abaixo</div>
+        </div>
+      </div>
+
+      <table class="indent" style="width:calc(100% - 50px);">
+        <tr><th>Campo</th><th>Valor</th></tr>
+        <tr><td><strong>Name</strong></td><td>SAP Scrubbing MCP</td></tr>
+        <tr><td><strong>URL</strong></td><td><code>http://localhost:8812/mcp</code></td></tr>
+        <tr><td><strong>Auth</strong></td><td>None</td></tr>
+      </table>
+
+      <div class="card card-info indent">
+        <div class="card-icon">💡</div>
+        <div class="card-body">
+          <strong>O que é "localhost"?</strong>
+          <p><code>localhost</code> significa "este computador". Essa URL só funciona na sua máquina — não compartilhe com outras pessoas.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Ative o conector na conversa</div>
+          <div class="step-sub">O conector precisa estar ativo em cada conversa onde você quiser usar o scrubbing</div>
+        </div>
+      </div>
+      <p class="indent">Após salvar, abra uma conversa no Joule Desktop. Na barra de input, clique no ícone de <strong>Connectors</strong> e certifique-se de que <strong>SAP Scrubbing MCP</strong> está habilitado para essa conversa.</p>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div>
+          <div class="step-title">Teste o conector</div>
+          <div class="step-sub">Confirme que o servidor e a skill estão funcionando corretamente</div>
+        </div>
+      </div>
+
+      <p class="indent" style="margin-bottom:0.8rem;">Abra uma nova conversa e pergunte ao Joule:</p>
+      <div class="cmd-wrap indent">
+        <pre><code id="cmd-test">"Quem sou eu no Harmony SAP?"</code></pre>
+        <button class="copy-btn" onclick="copyCmd('cmd-test', this)">Copiar</button>
+      </div>
+
+      <div class="card card-success indent">
+        <div class="card-icon">✅</div>
+        <div class="card-body">
+          <strong>Se aparecer seu nome e I-number — está tudo funcionando!</strong>
+          <p>O servidor MCP está conectado ao Harmony e o Joule está pronto para fazer scrubbing.</p>
+        </div>
+      </div>
+      <div class="card card-warning indent">
+        <div class="card-icon">⏱</div>
+        <div class="card-body">
+          <strong>Primeira vez pode demorar ~10 segundos</strong>
+          <p>O servidor faz login automático no SAP na primeira chamada da sessão.</p>
+        </div>
+      </div>
+
+      <div class="card card-success" style="margin-top:2rem;">
+        <div class="card-icon">✅</div>
+        <div class="card-body">
+          <strong>Servidor instalado e conector configurado</strong>
+          <p>O servidor MCP está rodando e o Joule Desktop já consegue se comunicar com o Harmony SAP. Esta etapa está concluída.</p>
+        </div>
+      </div>
+
+      <h2 style="margin-top:2rem;">Próximo passo: baixar e configurar a Scrubbing Skill</h2>
+      <p>Para que o Joule saiba executar o processo oficial de scrubbing, é necessário instalar a Skill. Ela define o fluxo completo: naming convention, cálculo de IPCA, consulta ao DCD, atualização do Renewal Execution e muito mais — tudo de forma automatizada.</p>
+      <p style="color:var(--muted); font-size:0.92rem;">Clique no botão abaixo para ir direto às instruções de instalação da Skill.</p>
+
+      <p style="margin-top:1.5rem;">
+        <a class="btn" href="#" onclick="show('skill'); return false;">
+          <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7 7-7z"/></svg>
+          Ir para: Instalar a Scrubbing Skill →
+        </a>
+      </p>
+
+    </section>
+
+    <!-- ══════════════════════════════════════════ FAQ ══ -->
+    <section class="page" id="page-faq">
+      <h1>❓ Perguntas Frequentes</h1>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-question">O servidor não iniciou automaticamente. O que faço?<span class="faq-chevron">▼</span></div>
+        <div class="faq-answer">
+          <strong>Mac:</strong> Clique duas vezes no arquivo <strong>"SAP Scrubbing MCP.command"</strong> na sua Área de Trabalho.<br><br>
+          <strong>Windows:</strong> Clique duas vezes no arquivo <strong>"SAP Scrubbing MCP.bat"</strong> na sua Área de Trabalho.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-question">O Joule diz "não foi possível conectar". O que faço?<span class="faq-chevron">▼</span></div>
+        <div class="faq-answer">
+          1. Verifique se o servidor está rodando: abra o navegador e acesse <code>http://localhost:8812/mcp</code><br>
+          2. Se não responder, inicie o servidor clicando no atalho na Área de Trabalho.<br>
+          3. Verifique se o conector está ativo na conversa (ícone de Connectors na barra de input).<br>
+          4. Tente novamente no Joule.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-question">Apareceu um erro de segurança no Windows. O que faço?<span class="faq-chevron">▼</span></div>
+        <div class="faq-answer">
+          Clique em <strong>"Mais informações"</strong> na janela de aviso e depois em <strong>"Executar assim mesmo"</strong>. Isso é esperado para scripts PowerShell que não são da Microsoft Store.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-question">Não encontro a aba Skills no Joule. Onde fica?<span class="faq-chevron">▼</span></div>
+        <div class="faq-answer">
+          Na barra de navegação lateral esquerda do Joule Desktop, clique no ícone de <strong>Extensions</strong> (parece um cilindro/banco de dados). Na parte superior do painel que abre, você verá duas abas: <strong>Skills</strong> e <strong>Connectors</strong>. Clique em <strong>Skills</strong>.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-question">Precisa reinstalar quando atualizar o computador?<span class="faq-chevron">▼</span></div>
+        <div class="faq-answer">
+          Não. A instalação do servidor MCP é permanente e inicia automaticamente no login. A skill fica salva no Joule Desktop. Para atualizar para uma versão mais nova, basta executar o script de instalação novamente.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-question">Como parar o servidor MCP?<span class="faq-chevron">▼</span></div>
+        <div class="faq-answer">
+          <strong>Mac:</strong> Abra o Terminal e execute:<br>
+          <code>launchctl unload ~/Library/LaunchAgents/com.sap.scrubbing.plist</code><br><br>
+          <strong>Windows:</strong> Abra o Agendador de Tarefas, localize <strong>"SAP Scrubbing MCP"</strong> e clique em <strong>"Desabilitar"</strong>.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-question">Como atualizar a Skill para uma versão mais nova?<span class="faq-chevron">▼</span></div>
+        <div class="faq-answer">
+          1. Baixe o novo arquivo <code>skill.md</code> do repositório.<br>
+          2. No Joule Desktop, vá em Extensions → Skills, selecione a skill <strong>"scrubbing skill"</strong> e clique em <strong>"Uninstall"</strong> (menu de três pontos).<br>
+          3. Reinstale seguindo os passos da <a href="#" onclick="show('skill'); return false;" style="color:var(--blue);">Etapa 2</a>.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-question">Os cookies SAP expiraram. Como renovar?<span class="faq-chevron">▼</span></div>
+        <div class="faq-answer">
+          O servidor renova a autenticação automaticamente. Se o Joule reportar que os cookies expiraram, ele mesmo vai executar o procedimento de renovação. Se persistir, reinicie o servidor clicando no atalho na Área de Trabalho.
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<!-- ── Footer ── -->
+<footer>
+  SAP Scrubbing MCP — CRC Americas AI Project &nbsp;|&nbsp;
+  Suporte: <a href="mailto:crc-americas-ai@sap.com">crc-americas-ai@sap.com</a>
+</footer>
+
+<script>
+  function show(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav.sidebar a').forEach(a => a.classList.remove('active'));
+    var page = document.getElementById('page-' + pageId);
+    if (page) page.classList.add('active');
+    var navLink = document.getElementById('nav-' + pageId);
+    if (navLink) navLink.classList.add('active');
+    var sel = document.querySelector('.mobile-nav-select');
+    if (sel) sel.value = pageId;
+    window.scrollTo(0, 0);
+    return false;
+  }
+
+  function copyCmd(id, btn) {
+    var el = document.getElementById(id);
+    var text = el ? el.innerText.trim() : '';
+    navigator.clipboard.writeText(text).then(function() {
+      btn.textContent = '✓ Copiado!';
+      btn.classList.add('copied');
+      setTimeout(function() {
+        btn.textContent = 'Copiar';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  function toggleFaq(el) {
+    el.classList.toggle('open');
+  }
+</script>
+
+<script id="skill-embed">
+const SKILL_MD_CONTENT = `---
+name: scrubbing
+description: >
+  Executa scrubbing completo de uma oportunidade SAP: lê Harmony, DCD/CMS,
+  baixa e analisa o contrato PDF via pdftotext, valida OBV, calcula IPCA via
+  BCB série 433 e preenche todos os campos de Renewal Execution no Harmony.
+  100% headless via MCP — sem Playwright, sem browser.
+  Use quando o usuário disser "scrubbing", "scrub", "analisar oportunidade" ou fornecer um OPP_ID.
+argument-hint: <OPP_ID>
+arguments: [opp_id]
+allowed-tools: >
+  Bash
+user-invocable: true
+---
+
+# Scrubbing de Oportunidade SAP — Instrução para Joule
+
+Processo oficial SAP CRC de análise e atualização de oportunidades no Harmony antes da cotação.
+Baseado em: *How to Guide: Scrubbing Opportunities in CRM/HQ 2026* + *Opportunity Description Naming Convention*.
+
+Se o OPP_ID não for informado, perguntar: "Qual é o OPP_ID para scrubbing?"
+
+---
+
+## REGRA DE OURO — Sessão expirada em qualquer ponto
+
+**Se QUALQUER chamada a qualquer ferramenta retornar erro de autenticação (401 / 403 / CSRF inválido / sessão expirada / fetch failed / SAML redirect) — em QUALQUER fase do scrubbing:**
+
+1. Chamar imediatamente: \`renew_auth()\` ← tool disponível no servidor MCP local
+2. Aguardar ~30s até retornar \`ok: true\`
+3. Repetir a chamada que falhou e continuar de onde parou
+
+\`renew_auth()\` é um MCP tool, não um script de terminal. **NUNCA pedir ao usuário para rodar no CMD.** Se \`renew_auth()\` falhar com erro técnico, aí sim pedir ajuda ao usuário.
+
+---
+
+## Regras operacionais obrigatórias
+
+- **IS_EDITABLE:** verificar antes de qualquer escrita. Se \`false\` → análise de referência apenas, sem chamadas \`harmony_set_*\`.
+- **STATUS E0002/E0005:** análise-only, sem edição.
+- **Auto Renewal vs Active Renewal:** fonte primária = texto do PDF. "renovados automaticamente" = Auto. "A SAP e o Cliente podem concordar em renovar..." = Active. Active Renewal é **deviation obrigatória**.
+- **silentNoOp:true com changedNotes preenchido** = falso positivo CRLF/LF — notas gravadas com sucesso.
+- **NUNCA usar \`harmony_set_risk_notes\`** — usar sempre \`harmony_set_renewal_execution_notes\`.
+
+---
+
+## FASE 0 — Autenticação SAP
+
+**Executar sempre antes de qualquer outra fase.**
+
+### 0.1 Verificar auth (paralelo)
+
+\`\`\`
+harmony_whoami()
+dcd_whoami()
+\`\`\`
+
+- Se ambos retornam OK → prosseguir para FASE 1.
+- Se qualquer um retorna erro (401 / 403 / SAML / fetch failed) → FASE 0.2.
+
+### 0.2 Renovação automática (MCP tool — sem interação do usuário)
+
+\`\`\`
+renew_auth()
+\`\`\`
+
+\`renew_auth\` é um **MCP tool** registrado no servidor local (porta 8811) — não é um comando de terminal. Chamá-lo como qualquer outro tool DCD. Ele abre Edge com SSO corporativo Windows e atualiza os cookies automaticamente. Aguardar ~30s.
+
+Após conclusão → repetir \`harmony_whoami()\` + \`dcd_whoami()\` em paralelo.
+
+- Se OK → prosseguir para FASE 1.
+- Se \`renew_auth\` retornar erro técnico ("connection refused" / timeout) → FASE 0.3.
+
+### 0.3 Fallback manual (somente se renew_auth falhar com erro técnico)
+
+Informar o usuário:
+
+> "A renovação automática falhou com erro: [mensagem]. Por favor:
+> 1. Abra o Microsoft Edge
+> 2. Acesse Harmony: \`https://sapit-sales-prod-budgie.launchpad.cfapps.eu10.hana.ondemand.com/1c83fff3-0c88-41fa-a608-c0fa5d3dec6f.hdm.hdm/index.html\`
+> 3. Aguarde o login SSO automático
+> 4. Acesse DCD: \`https://sapit-finance-prod-eagle.launchpad.cfapps.eu10.hana.ondemand.com/51c308db-7700-446c-96ff-f0f82d613117.mdsdlcdcdcockpit.mdsdlcdcdcockpit/index.html\`
+> 5. Me avise quando terminar."
+
+Após confirmação → repetir \`harmony_whoami()\` + \`dcd_whoami()\` antes de prosseguir.
+
+---
+
+## FASE 1 — Ler o Harmony
+
+Chamar em paralelo:
+- \`harmony_opp_read(oppId, expand: "PartiesInvolved,Items,Attributes")\`
+- \`harmony_opp_list_quotes(oppId)\`
+- \`harmony_messages_set(oppId, type: "E")\`
+- \`harmony_messages_set(oppId, type: "W")\`
+- \`harmony_read_renewal_execution(oppId)\`
+
+Extrair obrigatoriamente:
+
+| Campo | Uso |
+|---|---|
+| \`ACCOUNT_NAME\` / \`ACCOUNT_ERP_ID\` | Cliente / ERP para DCD |
+| \`DESCRIPTION\` | Título atual — verificar naming convention |
+| \`OWNER_NAME\` | CRE |
+| \`STATUS\` | E0001 / E0007 / E0002 / E0005 / E0004 / E0003 |
+| \`IS_EDITABLE\` | Se false → análise apenas |
+| \`EXPECT_END\` | Close Date — calcular D-30 |
+| \`RENEWAL_CONTRACT_TYPE\` | EEI? |
+| \`Items[].PRODUCT_DESCR\` | Produtos |
+| \`Items[].ORDER_BASE_VALUE\` | OBV de cada item |
+| \`Items[].PREV_CONTR_ID\` | Predecessores — registrar IDs únicos |
+| \`Items[].PREV_CONTR_ITEM_END_DATE\` | Data fim predecessor (para IPCA) |
+| \`Items[].UPLIFT\` | Uplift atual |
+| \`Items[].IS_FIRST_REN\` | \`"X"\` = primeira renovação |
+| \`PartiesInvolved\` | AO = role \`ZOZOPA01\` / CRE = role \`ZOZOCREX\` ou \`ZOZOPO01\` |
+| \`Attributes[BUSINESS_MODEL]\` | Ex: Cloud Choice Flex |
+
+Registrar o que já está preenchido em \`harmony_read_renewal_execution\` para não sobrescrever.
+
+### Análise do título (naming convention oficial SAP)
+
+**Formato:** \`#[HASHTAG] [Customer Name] Q[N]-[YY]\`
+
+**Tabela LOB por Sub-Solution Area:**
+
+| Sub-Solution Area | #LOB |
+|---|---|
+| BTP Other, CIAM (CDC), SAP Build, SAP Integration Suite, Enterprise Agreements | \`#BTP\` |
+| SuccessFactors (qualquer módulo SFSF), SmartRecruiters | \`#HCM\` |
+| Sales Performance Management / SAP Incentive Management (Callidus Cloud) | \`#SPM\` |
+| Emarsys, Commerce, Marketing, Sales and Service | \`#CX\` |
+| Artificial Intelligence, BDC, Data & Analytics Private, Database Cloud | \`#DAI\` |
+| Ariba, Fieldglass, Finance, GRC, Quote to Cash, S/4HANA Finance, Treasury | \`#FSM\` |
+| Taulia | \`#TAU\` |
+| Business Network, SCM, Make & Deliver, Operate & Service, Plan | \`#SCM\` |
+| Customer-Specific Applications, S/4HANA Private | \`#CERP\` |
+| HEC IaaS | \`#HEC\` |
+| Qualtrics | \`#QLT\` |
+| B1, ByDesign | \`#BYD\` |
+| Training & Adoption | \`#EDU\` |
+| WalkMe | \`#WM\` |
+| Signavio | \`#SIG\` |
+| LeanIX | \`#LIX\` |
+
+**Multi-LOB:** produtos em 2+ solution areas → \`#MXBOM #[LOB com maior OBV]\`
+
+**Quarter SAP (de EXPECT_END):** Jan–Mar = Q2 | Abr–Jun = Q3 | Jul–Set = Q4 | Out–Dez = Q1 (ano seguinte)
+
+**Nome do cliente:** remover sufixos legais (S.A., LTDA., S/A, SA) + Title Case.
+
+---
+
+## FASE 2 — Mapeamento de contratos via DCD
+
+\`dcd_customer_contracts(ACCOUNT_ERP_ID)\`
+
+Para cada \`PREV_CONTR_ID\` único:
+1. Paddar com zeros à esquerda até 10 dígitos
+2. Localizar em \`contracts[]\` onde \`SALES_DOC_ID === prevContrIdPadded\`
+3. Registrar: \`{ caseId, startDate, endDate, aacv, dealType }\`
+
+---
+
+## FASE 3 — Baixar o PDF do contrato
+
+\`\`\`
+dcd_contract_documents(caseId)
+dcd_download_contract(caseId, outDir: "C:/Users/I779229/Downloads/scrubbing-<oppId>")
+\`\`\`
+
+Se \`downloaded: []\` → tentar com \`documentId\` explícito do \`skipped\`.
+
+**PDF indisponível (DCD sem documentos):**
+- Flag: "no documents found in DCD"
+- Usar DCD TCV/AACV como referência de OBV
+- Calcular IPCA mesmo assim (datas do Harmony como base)
+- GTC Date: não preencher
+- Uplift Type: CPI Per Annum + nota de incerteza sobre cláusula
+- Renewal Type: assumir Auto se opp name indicar; documentar premissa
+
+---
+
+## FASE 4 — Ler o PDF
+
+\`\`\`bash
+pdftotext -layout "<caminho_do_pdf>" -
+\`\`\`
+
+Extrair obrigatoriamente:
+
+| O que extrair | Onde |
+|---|---|
+| OBV por período (Anexo 1) | Tabela de produtos; se ramp-up → usar valor do **último período** |
+| Renewal Type | "renovados automaticamente" = Auto / "podem concordar em renovar" = Active |
+| Cláusula IPCA/uplift | §3.2 / §5.4 / §6.4 — aniversário e indexador |
+| GTC version | Rodapé \`ptBR.v.X-YYYY\` → GTC Date = \`YYYY-0X-01\` |
+| Parceiro | §7.3 ou seção de envolvimento do parceiro |
+
+**SAP Store digital orders:** sem rodapé → GTC Date = N/A, não preencher o campo.
+
+---
+
+## FASE 5 — Cálculo IPCA via BCB
+
+\`\`\`
+Lookback = (Contract Start − 6 meses) → (Contract End − 6 meses)
+\`\`\`
+
+Chamar API BCB série 433:
+\`\`\`
+https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY
+\`\`\`
+
+Via Node.js (Windows não tem \`/dev/stdin\`):
+\`\`\`bash
+node -e "
+fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY')
+  .then(r=>r.json()).then(d=>{
+    const acc = d.reduce((p,c)=>p*(1+parseFloat(c.valor)/100),1)-1;
+    console.log('IPCA acumulado:', (acc*100).toFixed(4)+'%', '| meses:', d.length);
+  });
+"
+\`\`\`
+
+Calcular: \`((1+m1) × (1+m2) × ... × (1+mN)) − 1\`
+
+**IPCA já aplicado** = \`(Harmony OBV − PDF OBV) / PDF OBV × 100\`
+
+**IPCA a sugerir** = total acumulado − já aplicado
+
+**OBV alvo** = \`Harmony OBV × (1 + sugerido)\`
+
+Meses não publicados → valor parcial + registrar range pendente em ZRE6.
+
+---
+
+## FASE 6 — Preencher o Harmony
+
+**Pré-condição:** IS_EDITABLE = true e STATUS ≠ E0002/E0005.
+
+### 6.0 Título
+\`\`\`
+harmony_set_opp_description(oppId, text: "#[HASHTAG] [Cliente] Q[N]-[YY]")
+\`\`\`
+
+### 6.1 Close Date (Auto Renewal)
+\`\`\`
+harmony_set_close_date(oppId, date: "YYYY-MM-DD")  ← PREV_CONTR_ITEM_END_DATE − 30 dias
+\`\`\`
+\`CLOSE_DATE_EDITABLE: false\` não impede a escrita — sempre chamar.
+
+### 6.2 Risk Retention Lever
+\`\`\`
+harmony_set_renewal_risk(oppId, riskRetentionLever: "NON")  ← ou "CMI" se CCFlex + churn ativo
+\`\`\`
+
+### 6.3 Campos de Renewal Execution
+\`\`\`
+harmony_set_renewal_execution(oppId, patch: {
+  obvValidated:    "Y",
+  gtcDate:         "YYYY-MM-DD",   ← do rodapé; omitir se SAP Store ou PDF indisponível
+  contrUpliftType: "7",            ← "1" se No Increase
+  contrUpliftPc:   "X.XX",
+  negUpliftLang:   "Y",            ← Y se IPCA/tributos mencionados
+  gtcDeviations:   "N"             ← "Y" se Active Renewal / pagamento atípico / etc.
+})
+\`\`\`
+
+### 6.4 Notas (SEMPRE usar \`harmony_set_renewal_execution_notes\` — NUNCA \`harmony_set_risk_notes\`)
+
+\`\`\`
+harmony_set_renewal_execution_notes(oppId, {
+  obvValidatedNote:   "<ZRE1>",
+  renewalClosePlan:   "<ZRE4>",
+  upliftRemarks:      "<ZRE6>",
+  perAnnumLanguage:   "<ZRE8>",           ← somente se IPCA confirmado no PDF
+  gtcDeviationsText:  "<ZRE3>",           ← somente se GTC Deviations = Y
+  redlines:           "<ZREE>",           ← cópia idêntica de ZRE3
+  internalRoadblocks: "<ZRED>",           ← somente se há bloqueadores reais
+})
+\`\`\`
+
+### Templates de nota
+
+**ZRE1 (OBV Validated) — PDF disponível:**
+\`\`\`
+- [N]-month contract | [Auto/Active Renewal]
+- Contract OBV (PDF): BRL [valor] → Harmony OBV: BRL [valor] ([delta%] IPCA applied over contract years)
+[Scrubbot, DD/MM/YYYY]
+\`\`\`
+
+**ZRE1 — PDF indisponível:**
+\`\`\`
+- [N]-month contract | [Auto/Active Renewal — assumed]
+- Harmony OBV: BRL [valor] | DCD TCV reference: [moeda] [valor]
+- Contract documents not available in DCD — OBV validated against Harmony line items only
+[Scrubbot, DD/MM/YYYY]
+\`\`\`
+
+**ZRE4 (Renewal Close Plan):**
+\`\`\`
+- CRE: [nome] | AO: [nome]
+- [Auto/Active Renewal] — standard close expected
+[Scrubbot, DD/MM/YYYY]
+\`\`\`
+
+**ZRE6 (Uplift % Remarks):**
+\`\`\`
+- Cumulative IPCA available: X.XX% (N/M months published)
+- Already applied: X.XX%
+- Suggested: X.XX% [partial — pending IBGE: Mmm/YYYY–Mmm/YYYY — update once published]
+[Scrubbot, DD/MM/YYYY]
+\`\`\`
+
+**ZRE8 (Per Annum Language):**
+\`\`\`
+- §X.X: [citação breve da cláusula IPCA — aniversário e indexador]
+[Scrubbot, DD/MM/YYYY]
+\`\`\`
+
+### Regras absolutas das notas
+
+**NUNCA incluir:**
+- IDs internos: CMS case ID, order numbers, item numbers
+- Date ranges de contratos ou itens
+- Referência "BCB série 433", janela de lookback, meses individuais com %
+- Sub-itens de faturamento (Cloud 90% / Service 10%)
+- Componentes de billing ("Items X and Y are billing sub-components of item Z")
+- Mecânica de auto-renewal: prazo de aviso, deadline de cancelamento
+- Ausência de riscos ou problemas
+- Segmento do cliente / lista de produtos
+
+### Ações manuais (não automatizáveis — registrar no relatório)
+
+- **Renewal Type:** alterar manualmente na UI Harmony para Auto/Active Renewal
+- **Incremental Increase Block:** definir Increase Type + Increase % por item na UI Harmony
+
+---
+
+## FASE 7 — Relatório (gerar no chat)
+
+\`\`\`
+SCRUBBING CONCLUÍDO — OPP [oppId]
+[DD/MM/YYYY]
+
+• Cliente: [nome] | CRE: [nome] | AO: [nome]
+• Renewal Type: [Auto / Active]
+• Vencimento: [data] | Close Date: [data] (D-30)
+• OBV PDF: BRL [valor] → OBV Harmony: BRL [valor] ([delta%])
+• IPCA total: [X.XX%] | Já aplicado: [X.XX%] | Sugerido: [X.XX%] [parcial se aplicável]
+• OBV alvo renovação: BRL [valor]
+• GTC: ptBR.v.[X]-[YYYY] → [data] | Deviations: [N / resumo]
+
+CAMPOS ATUALIZADOS
+✓ Título / ✓ Close Date / ✓ Risk Lever / ✓ OBV Validated / ✓ GTC Date
+✓ Uplift Type / ✓ Uplift % / ✓ Per Annum Language / ✓ ZRE1 / ✓ ZRE4 / ✓ ZRE6 / ✓ ZRE8
+
+AÇÕES MANUAIS
+⚠ Renewal Type: definir na UI Harmony
+⚠ Incremental Increase Block: CPI Per Annum + [X.XX%] por item na UI
+
+FLAGS
+• [lista ou —]
+\`\`\`
+
+---
+
+## Checklist de conclusão
+
+- [ ] harmony_opp_read — header + Items + PartiesInvolved
+- [ ] Quotes, erros e warnings verificados
+- [ ] harmony_read_renewal_execution — estado inicial registrado
+- [ ] dcd_customer_contracts — todos os PREV_CONTR_ID mapeados a CASE_ID
+- [ ] PDF baixado com dcd_download_contract
+- [ ] PDF lido via pdftotext: OBV Anexo 1, cláusula IPCA, rodapé GTC, renewal type, parceiro
+- [ ] OBV conferido (Harmony vs PDF)
+- [ ] IPCA calculado via BCB série 433 (total / já aplicado / a sugerir)
+- [ ] OBV alvo calculado
+- [ ] harmony_set_opp_description — título corrigido
+- [ ] harmony_set_close_date — D-30 (Auto Renewal)
+- [ ] harmony_set_renewal_risk — Risk Retention Lever
+- [ ] harmony_set_renewal_execution — campos preenchidos
+- [ ] harmony_set_renewal_execution_notes — changedNotes preenchido
+- [ ] Ações manuais listadas no relatório
+
+`;
+
+function downloadSkill() {
+  var blob = new Blob([SKILL_MD_CONTENT], { type: 'text/markdown;charset=utf-8' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'skill.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
+
