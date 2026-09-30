@@ -378,17 +378,27 @@ Para todos os demais: usar datas do contrato DCD mapeado na Fase 2 (ou `PREV_CON
 
 ### 6.3 Cálculo via API BCB (série 433)
 
+> **REGRA ABSOLUTA:** NUNCA usar WebFetch, WebSearch ou qualquer site externo para obter dados de IPCA. SEMPRE e exclusivamente Bash + Node.js abaixo. Uma única chamada por predecessor, cobrindo o período completo — NUNCA fazer chamadas individuais por mês ou por ano.
+
 ```
 Janela = (Start Date − 6 meses) → (End Date − 6 meses)
 ```
 
 ```bash
-curl "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY"
+node -e "
+fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY')
+  .then(r=>r.json()).then(d=>{
+    const acc = d.reduce((p,c)=>p*(1+parseFloat(c.valor)/100),1)-1;
+    console.log('IPCA:', (acc*100).toFixed(4)+'%', '| meses:', d.length);
+  });
+"
 ```
 
 Calcular produto cumulativo: `((1+m1) × (1+m2) × ... × (1+mN)) − 1`
 
 Meses não publicados pelo IBGE → sinalizar como "pending IBGE publication" e usar valor parcial.
+
+**Se a API BCB falhar** (timeout, sem conectividade) → registrar flag "IPCA pendente — BCB indisponível" no relatório e continuar. Não tentar alternativas via web.
 
 ### 6.4 OBV Alvo por contrato
 
@@ -578,7 +588,7 @@ Aditivo 1:
 
 ### 7.7 Ações manuais (não automatizáveis via MCP — registrar no relatório)
 
-- **Renewal Type:** não editável via MCP — alterar manualmente na UI Harmony
+- **Renewal Type:** registrar como ação manual **somente** quando o PDF indicar **Active Renewal**. Se PDF = Auto Renewal (padrão), **não gerar esta flag**.
 - **Incremental Increase Block por item:** definir `Increase Type` e `Increase %` para cada linha na UI Harmony
 
 ---
@@ -624,7 +634,7 @@ CAMPOS PREENCHIDOS NO HARMONY
 • Per Annum Language: [Y / N]
 
 AÇÕES MANUAIS PENDENTES
-• Renewal Type: alterar para [Auto/Active Renewal] na UI Harmony
+• Renewal Type: definir como Active Renewal na UI Harmony  ← incluir SOMENTE se PDF = Active Renewal
 • Incremental Increase Block: definir Increase Type = CPI Per Annum / Increase % = X.XX% por linha
 
 FLAGS

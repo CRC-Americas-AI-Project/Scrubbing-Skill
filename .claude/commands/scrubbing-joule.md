@@ -210,16 +210,18 @@ Extrair obrigatoriamente:
 
 ## FASE 5 — Cálculo IPCA via BCB
 
+> **REGRA ABSOLUTA:** NUNCA usar WebSearch, WebFetch, browser ou qualquer busca online para obter índices IPCA. SEMPRE e exclusivamente Bash + API BCB abaixo. Uma única chamada Bash por predecessor, cobrindo o período completo — NUNCA fazer chamadas individuais por mês ou por ano.
+
 ```
 Lookback = (Contract Start − 6 meses) → (Contract End − 6 meses)
 ```
 
-Chamar API BCB série 433:
+Chamar API BCB série 433 — **uma única chamada por predecessor, cobrindo todo o período:**
 ```
 https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY
 ```
 
-Via Node.js (Windows não tem `/dev/stdin`):
+Via Node.js (único método válido — Windows e macOS):
 ```bash
 node -e "
 fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY')
@@ -240,6 +242,8 @@ Calcular: `((1+m1) × (1+m2) × ... × (1+mN)) − 1`
 
 Meses não publicados → valor parcial + registrar range pendente em ZRE6.
 
+**Se a API BCB falhar** (timeout, sem conectividade) → registrar flag "IPCA pendente — BCB indisponível" no relatório e continuar o scrubbing. Não tentar alternativas via web.
+
 ---
 
 ## FASE 6 — Preencher o Harmony
@@ -256,6 +260,8 @@ harmony_set_opp_description(oppId, text: "#[HASHTAG] [Cliente] Q[N]-[YY]")
 harmony_set_close_date(oppId, date: "YYYY-MM-DD")  ← PREV_CONTR_ITEM_END_DATE − 30 dias
 ```
 `CLOSE_DATE_EDITABLE: false` não impede a escrita — sempre chamar.
+- `ok: true` (mesmo com `wasEditable: false`) → atualizado com sucesso
+- `ok: false` (backend rejeitou) → registrar no relatório como ação manual
 
 ### 6.2 Risk Retention Lever
 ```
@@ -348,7 +354,7 @@ harmony_set_renewal_execution_notes(oppId, {
 
 ### Ações manuais (não automatizáveis — registrar no relatório)
 
-- **Renewal Type:** alterar manualmente na UI Harmony para Auto/Active Renewal
+- **Renewal Type:** registrar como ação manual **somente** se o PDF indicar **Active Renewal**. Se PDF = Auto Renewal (padrão), **não gerar esta flag**.
 - **Incremental Increase Block:** definir Increase Type + Increase % por item na UI Harmony
 
 ---
@@ -372,7 +378,7 @@ CAMPOS ATUALIZADOS
 ✓ Uplift Type / ✓ Uplift % / ✓ Per Annum Language / ✓ ZRE1 / ✓ ZRE4 / ✓ ZRE6 / ✓ ZRE8
 
 AÇÕES MANUAIS
-⚠ Renewal Type: definir na UI Harmony
+⚠ Renewal Type: definir como Active Renewal na UI Harmony  ← incluir SOMENTE se PDF = Active Renewal
 ⚠ Incremental Increase Block: CPI Per Annum + [X.XX%] por item na UI
 
 FLAGS
