@@ -261,7 +261,7 @@ harmony_set_close_date(oppId, date: "YYYY-MM-DD")  ← PREV_CONTR_ITEM_END_DATE 
 ```
 `CLOSE_DATE_EDITABLE: false` não impede a escrita — sempre chamar.
 - `ok: true` (mesmo com `wasEditable: false`) → atualizado com sucesso
-- `ok: false` (backend rejeitou) → registrar no relatório como ação manual
+- `ok: false` (backend rejeitou) → registrar no relatório como ação manual incluindo o texto de `errorMessage` da resposta
 
 ### 6.2 Risk Retention Lever
 ```
@@ -379,6 +379,7 @@ CAMPOS ATUALIZADOS
 
 AÇÕES MANUAIS
 ⚠ Renewal Type: definir como Active Renewal na UI Harmony  ← incluir SOMENTE se PDF = Active Renewal
+⚠ Close Date: definir como [data] na UI Harmony — SAP backend rejeitou: [errorMessage]  ← incluir SOMENTE se ok: false
 ⚠ Incremental Increase Block: CPI Per Annum + [X.XX%] por item na UI
 
 FLAGS

@@ -473,7 +473,7 @@ harmony_set_opp_description(opp_id, text: "<título corrigido>")
    ```
    - **Nunca pular esta chamada** — `CLOSE_DATE_EDITABLE: false` é apenas estado da UI; o MCP bypassa e grava mesmo assim
    - `ok: true` (mesmo com `wasEditable: false`) → atualizado com sucesso
-   - `ok: false` → flag: "Close Date bloqueado — revisão manual necessária"
+   - `ok: false` → flag: "Close Date bloqueado — revisão manual necessária: [errorMessage]"
 
 ### 7.2 Risk Retention Lever
 
@@ -635,6 +635,7 @@ CAMPOS PREENCHIDOS NO HARMONY
 
 AÇÕES MANUAIS PENDENTES
 • Renewal Type: definir como Active Renewal na UI Harmony  ← incluir SOMENTE se PDF = Active Renewal
+• Close Date: definir como [data] na UI Harmony — SAP backend rejeitou: [errorMessage]  ← incluir SOMENTE se ok: false
 • Incremental Increase Block: definir Increase Type = CPI Per Annum / Increase % = X.XX% por linha
 
 FLAGS

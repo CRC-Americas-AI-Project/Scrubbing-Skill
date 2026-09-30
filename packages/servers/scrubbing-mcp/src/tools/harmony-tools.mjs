@@ -377,7 +377,7 @@ export const HARMONY_TOOLS = [
   },
   {
     name: 'harmony_set_close_date',
-    description: 'Set the opportunity Close Date (EXPECT_END) headlessly — HEADLESS. Checks CLOSE_DATE_EDITABLE first; if locked returns { ok: false, wasEditable: false } without touching the server. Returns { ok, status, wasEditable, closeDateAfter }.',
+    description: 'Set the opportunity Close Date (EXPECT_END) headlessly — HEADLESS. Checks CLOSE_DATE_EDITABLE first; if locked returns { ok: false, wasEditable: false } without touching the server. Returns { ok, status, wasEditable, closeDateAfter, errorMessage? }. errorMessage is populated with the SAP backend error text when ok: false.',
     inputSchema: {
       type: 'object',
       required: ['oppId', 'date'],

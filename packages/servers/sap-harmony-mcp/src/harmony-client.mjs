@@ -1369,11 +1369,16 @@ export async function setCloseDate(oppId, dateStr) {
 
   const res = await odataCreate('Opportunities', entity);
   const echo = res.body?.d;
+  const errorMessage = res.ok ? undefined
+    : (res.body?.error?.message?.value
+        ?? (typeof res.body?.error?.message === 'string' ? res.body.error.message : null)
+        ?? (res.body ? JSON.stringify(res.body).slice(0, 300) : `HTTP ${res.status}`));
   return {
     ok: res.ok,
     status: res.status,
     wasEditable,
     closeDateAfter: echo?.EXPECT_END ?? null,
+    ...(errorMessage !== undefined ? { errorMessage } : {}),
     body: res.ok ? undefined : res.body,
   };
 }
