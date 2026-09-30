@@ -30,8 +30,8 @@ function getCommonChromeArgs() {
         '--no-first-run',
         '--disable-default-apps',
         '--use-system-certificate-store',
-        '--auth-server-whitelist=*.sap.com,*.one.int.sap,*.wdf.sap.corp',
-        '--auth-negotiate-delegate-whitelist=*.sap.com,*.one.int.sap,*.wdf.sap.corp',
+        '--auth-server-whitelist=*.sap.com,*.one.int.sap,*.wdf.sap.corp,*.hana.ondemand.com,*.ondemand.com',
+        '--auth-negotiate-delegate-whitelist=*.sap.com,*.one.int.sap,*.wdf.sap.corp,*.hana.ondemand.com,*.ondemand.com',
         '--auth-schemes=basic,digest,ntlm,negotiate',
         '--window-size=1200,800',
     ];
